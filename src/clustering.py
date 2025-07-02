@@ -300,7 +300,7 @@ def print_clusters(clusters, count, large_merges, paired, config, z_score):
     count2 = count[c2]
     merge_size = min(count1, count2)
     if merge_size > 0.1*config.num:
-        large_merges.append([(c1, c2), (count1, count2), z_score])
+        large_merges.append([c1, c2, count1, count2, z_score])
 
     # update clusters by merging two
     if c1 < c2:
@@ -379,7 +379,8 @@ def clustering_main(lines, config, clic_dir, ids):
     #print(f"clustering/N: {(time.time() - timer_cl)/config.num}")
 
     star_writer.end_write(tags, table, z_score_list, clic_dir, ids)
-    np.save(f"{clic_dir}/large_merges", large_merges)
+
+    np.save(f"{clic_dir}/large_merges", np.asarray(large_merges))
 
     np.save(f"{clic_dir}/dendrogram", Z)
     fig = plt.figure(figsize=(25, 10))
@@ -392,7 +393,7 @@ def clustering_main(lines, config, clic_dir, ids):
         # Add color to dendro labels
         xlbls = ax.get_xmajorticklabels()
         ### Check for binary simualted data ###
-        ids_ints = ids_to_int(ids)
+        ids_ints = [i for i in range(len(ids))]
         gt_ids_bin = [x % config.num_clusters for x in ids_ints]
         for lbl in xlbls:
             if gt_ids_bin[int(lbl.get_text())] == 0:

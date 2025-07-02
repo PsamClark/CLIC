@@ -14,10 +14,9 @@ from sinogram_input import sinogram_main
 from sinogram_input import get_part_locs
 from dim_red import fitmodel
 from clustering import clustering_main
-from CLIC_plot import plot
+from plt_truth import plot
 import clustering
 import star_writer
-import plt_truth
 import discrete
 import min_matrix
 import sin_guesser
@@ -65,7 +64,16 @@ speeds up process and requires less memory. Recommended batch size is
 parser.add_argument("-b", "--batch_size", help=t, default=-1, type=int)
 
 t = ''' Downscaling of image prior to making sinograms '''
-parser.add_argument("-d", "--down_scale", help=t, default=2, type=int)
+parser.add_argument("-d", "--down_scale", help=t, type=int, default = 1)
+
+t = ''' value of image filter highpass resolution '''
+parser.add_argument("-hp", "--highpass", help=t, type=int)
+
+t = ''' value of image filter lowpass resolution '''
+parser.add_argument("-lp", "--lowpass", help=t, default=5, type=int)
+
+t = ''' image filter method '''
+parser.add_argument("-fm", "--filter_method", help=t, default="butter", type=str)
 
 t = ''' Number of components of dimensional reduction technique. This
 requires some experimentation '''
@@ -109,19 +117,22 @@ def batching(n, b_size):
 
 if __name__ == '__main__':
     start = time.time()
-    time_stamp = time.strftime("%Y%m%d-%H%M%S")
-    clic_dir = f'CLIC_Job_{time_stamp}'
+    clic_dir = f'CLIC_Job_{args.model}_n{args.num}_k{args.num_clusters}_c{args.num_comps}'
     os.makedirs(clic_dir, exist_ok = True)
 
-    part_locs, n = get_part_locs(args)  # arg in this list is g_id
+    part_locs, n = get_part_locs(args) 
     batches = batching(n, args.batch_size)
+
+    with open(f"{clic_dir}/particle_ids.txt", "w") as fl:
+        for line in part_locs:
+            fl.write(f"{line}\n")
 
     all_name_ids = []
     b = 0
     matrix = np.zeros((len(batches), n, args.num_clusters))
     for batch in batches:
         start_batch = time.time()
-        batch_dir = f'CLIC_Job_{time_stamp}/batch_{b}'
+        batch_dir = f'{clic_dir}/batch_{b}'
         os.makedirs(batch_dir, exist_ok = True)
         print(f"### Running batch {b+1} of {len(batches)} with size {len(batch)} particles ###")
 
@@ -134,35 +145,6 @@ if __name__ == '__main__':
         args.num = num  # Update with lowest num
         lines_reddim, model = fitmodel(all_ims, args.model, args.num_comps)
 
-        """
-        Optional code 
-        """
-        """ 
-        for generating figures for pca recon and eigenfilters 
-        """
-        """
-        import pca_recon
-        pca_recon.recon_sino(all_ims[-1], model, args)
-        pca_recon.plt_comps(model)
-        plt.show()
-        plot(lines_reddim, args.num, clic_dir, name_ids)
-        """
-
-        """ 
-        for experiment looking at how common line group spreads with noise
-        """
-        """
-        r_lines = discrete.rand_lines(lines_reddim, n_rand=100)
-        discrete.get_stats(r_lines)
-        # r = 17.5
-        all_groups = sin_guesser.main(args.num, r)
-        theta = 3
-        th_lines = sin_guesser.choose_rand_group(all_groups)
-
-        group_lines = discrete.get_discrete_lines(lines_reddim, th_lines, r, theta)
-        discrete.get_stats(group_lines)
-        discrete.plot(group_lines, lines_reddim)
-        """
 
         batch_classes = clustering_main(lines_reddim, args, batch_dir, name_ids)
         matrix[b] = min_matrix.make_slice(batch_classes, batch, matrix.shape)

@@ -10,13 +10,20 @@ import mrcfile
 import gemmi
 import entropy_filter
 import random
+import spectral
 import cv2
 
 
 def load_mrc(path):
+
     with mrcfile.open(path) as f:
         image = f.data
-    return image
+
+    if image.ndim == 3:
+
+        return image[0]
+    else:
+        return image
 
 
 def stand_image(image):
@@ -47,7 +54,7 @@ def add_trans(image, trans=0.05):
 
 def downscale(image, ds):
     image_resized = resize(image,
-                           (image.shape[0] // ds, image.shape[1] // ds),
+                           (ds, ds),
                            anti_aliasing=True)
     return image_resized
 
@@ -87,24 +94,15 @@ def gblur(im):
     return im
 
 
-def pre_process(im, config, n):
-    #im = add_trans(im)  # for testing
+def pre_process(im, config, n, ds_size):
     if config.snr != -1:  # for testing
         im = add_noise(im, config.snr)
-    im = downscale(im, config.down_scale)
+    im,_ = spectral.bandpass_image(im, low=config.lowpass,
+                                 high = config.highpass, method = config.filter_method)
+    im = downscale(im, ds_size)
     im = stand_image(im)
-
     # masks: circular default. Been testing entropy filter
     im = circular_mask(im)
-    # im = entropy_filter.main(im)
-
-    # optional displaying (for debug)
-    # import matplotlib.pyplot as plt
-    # plt.figure('masked_im')
-    # plt.imshow(im, cmap='gray')
-    # plt.axis('off')
-    # plt.savefig(f'masked_im{n}.png', bbox_inches='tight')
-    # plt.show()
 
     sino = make_sinogram(im, config.nlines)
     return sino
@@ -124,7 +122,6 @@ def get_part_locs(config):
         if part_locs == []:
             print(f"Error: No mrc found in: {dset_path}")
             exit()
-        part_locs = [f"{dset_path[:-5]}{x}.mrc" for x in range(n_max)]
     elif dset_path.endswith('star'):
         # read star file to extract im locs
         starfile = gemmi.cif.read_file(dset_path)
@@ -151,6 +148,8 @@ def open_part(x, part_locs, name_ids, dset_path, stacks={}):
     elif dset_path.endswith('mrc'):
         im_path = part_locs[x]
         im = load_mrc(im_path)
+
+
         name_ids.append(f'{im_path}')
 
     elif dset_path.endswith('star'):
@@ -179,10 +178,12 @@ def sinogram_main(config, part_locs, subset):
         im, name_ids, stacks = open_part(x_sb, part_locs, name_ids, config.data_set)
 
         if x == 0:  # first pass makes all_sinos
+            print(im.shape[0])
+            print(config.down_scale)
             ds_size = im.shape[0] // config.down_scale
             all_sinos = np.zeros((subsize, config.nlines, ds_size))
 
-        sino = pre_process(im, config, x_sb)
+        sino = pre_process(im, config, x_sb, ds_size)
         all_sinos[x] = sino
 
     return all_sinos, subsize, name_ids
