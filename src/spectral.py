@@ -51,8 +51,10 @@ def spectrum2d(image):
     return fourier_image
 
 def bandpass_image(image, low = None, high = None, width = 5, order = 20, pixel_size = 1,
-                   method = "butter", boost =False, bmethod = "exp"):
-
+                   method = "butter",):
+    
+    
+    image = resize(image, (1024,1024))
     lpass = np.inf
     hpass = 0
 
@@ -67,68 +69,32 @@ def bandpass_image(image, low = None, high = None, width = 5, order = 20, pixel_
     if high is not None:
         hpass = spec.shape[0]*pixel_size/high
 
-    bp_spec, mask = bpfilter(spec, lpass, hpass, width, order, method, boost = boost, bmethod = bmethod)
-    filt_im = np.fft.ifftshift(bp_spec)
-    filt_im = np.fft.ifftn(filt_im).real
-    filt_im += np.abs(np.min(filt_im))
+    bp_spec, mask = bpfilter(spec, lpass, hpass, width, order, method,)
+    filt_im_complex = np.fft.ifftshift(bp_spec)
+    filt_im_complex = np.fft.ifftn(filt_im_complex)
+    filt_im = np.abs(filt_im_complex)
+    filt_im -= np.min(filt_im)
 
     im_range = np.max(filt_im)
     filt_im /= im_range
 
-    #filt_im -= np.percentile(filt_im,80)
-    
-    #filt_im[filt_im<0] = 0
-    #filt_im /= np.max(filt_im)
-
     filt_im *= 255
 
-    filt_im = filt_im.astype(np.uint8)
+    filt_im -= 255
 
+    filt_im = np.abs(filt_im)
+
+    filt_im = filt_im.astype(np.uint8)
+    
     return filt_im, mask
 
-def boost_mask(mask, bins, spec, method="exp"):
 
-    centre = [mask.shape[0]//2, mask.shape[1]//2]
-    x_coord_vec = np.linspace(0, mask.shape[1], mask.shape[1])
-    y_coord_vec = np.linspace(0, mask.shape[0], mask.shape[0])
-    x_coord_mat, y_coord_mat = np.meshgrid(x_coord_vec, y_coord_vec, sparse=True)
-    sq1 = (y_coord_mat - centre[0]) ** 2
-    sq2 = (x_coord_mat - centre[1]) ** 2
-    sqs = sq1 + sq2
-
-    sq = np.sqrt(
-            sqs
-        )
-    
-    if method == "exp":
-
-        amp_profile = np.ones(len(spec))
-
-
-        max_amp = np.max(spec)
-
-        for i,amp in enumerate(spec):
-
-            amp_profile[i] *= max_amp/amp
-
-        poly = np.polyfit(bins,np.log(amp_profile),1)
-
-        mask_out = np.exp(poly[1])*np.exp(poly[0]*sq)
-
-    return mask_out
-
-def bpfilter(image, low = np.inf, high = 0, width = 5, order = 20, method = "butter", boost = False, bmethod = "exp"):
+def bpfilter(image, low = np.inf, high = 0, width = 5, order = 20, method = "butter",):
 
     
     mask = np.ones(image.shape)
 
-    if boost: 
-
-        kvals, abins = spectrum1d(image)
-
-        mask = boost_mask(mask, kvals, abins, method = bmethod)
-
-    elif method == "gauss":
+    if method == "gauss":
 
         mask = bp_gauss(mask, low, high, width)
 
