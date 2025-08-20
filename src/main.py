@@ -9,36 +9,25 @@ with each particle assigned to a cluster.
 
 Donovan Webb & Yuriy Chaban
 '''
+import argparse
+import os
+import sys
+import random
+import time
+
+# Other dependencies
+import matplotlib.pyplot as plt
 import numpy as np
+
 from sinogram_input import sinogram_main
 from sinogram_input import get_part_locs
 from dim_red import fitmodel
 from clustering import clustering_main
-from plt_truth import plot
+from log import random_string
+from log import store_config, store_images
 import clustering
 import star_writer
-import discrete
 import min_matrix
-import sin_guesser
-import argparse
-
-# Other dependencies
-from skimage.transform import radon, resize
-import mrcfile
-from sklearn.metrics.pairwise import euclidean_distances as eucl_dist
-import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import dendrogram, fcluster
-import time
-import gemmi
-import os
-import random
-from itertools import permutations
-import numba
-from numba import cuda
-import math
-import collections
-
-import sys
 
 # To silence deprecation warnings
 if not sys.warnoptions:
@@ -105,7 +94,6 @@ def batching(n, b_size):
     all_n = range(n)
     if b_size >= n or b_size == -1:
         return [all_n]
-    n_batches = int(np.ceil(2*n/b_size) - 1)
     num_half = int(np.floor(b_size/2))
     batches = np.array([np.concatenate((random.sample(range(0, x), num_half), np.array(range(x, x+num_half)))) for x in range(num_half*2, n, num_half)])
     batches = np.concatenate(([range(0, num_half*2)], batches))
@@ -117,9 +105,11 @@ def batching(n, b_size):
 
 if __name__ == '__main__':
     start = time.time()
-    clic_dir = f'CLIC_Job_{args.model}_n{args.num}_k{args.num_clusters}_c{args.num_comps}'
-    os.makedirs(clic_dir, exist_ok = True)
 
+
+    clic_dir = random_string(6)
+    os.makedirs(clic_dir, exist_ok = True)
+    store_config(args,clic_dir)
     part_locs, n = get_part_locs(args) 
     batches = batching(n, args.batch_size)
 
@@ -136,14 +126,16 @@ if __name__ == '__main__':
         os.makedirs(batch_dir, exist_ok = True)
         print(f"### Running batch {b+1} of {len(batches)} with size {len(batch)} particles ###")
 
-        all_ims, num, name_ids = sinogram_main(args, part_locs, batch)
+        all_sinos, all_ims, num, name_ids = sinogram_main(args, part_locs, batch)
+        if b == 0:
+            store_images(all_ims, all_sinos, name_ids, clic_dir)
         for name_id in name_ids:
             if name_id not in all_name_ids:
                 all_name_ids.append(name_id)
         star_file  = star_writer.create(name_ids, batch_dir)
 
         args.num = num  # Update with lowest num
-        lines_reddim, model = fitmodel(all_ims, args.model, args.num_comps)
+        lines_reddim, model = fitmodel(all_sinos, args.model, args.num_comps)
 
 
         batch_classes = clustering_main(lines_reddim, args, batch_dir, name_ids)
@@ -151,18 +143,18 @@ if __name__ == '__main__':
         print(f"   Batch time: {time.time() - start_batch:.2f}s")
         b += 1
 
-    np.save(f"{clic_dir}matrix.npy", matrix)
+    np.save(f"{clic_dir}/cluster_matrix.npy", matrix)
     aligned_matrix = min_matrix.align_batches(matrix)
     all_classes = min_matrix.make_line(aligned_matrix)
 
     # Score classes in testing. input alternates between classes. i.e. classes  0101010101...
     binary_test = False
     if binary_test == True:
-	    ids_ints = clustering.ids_to_int(all_name_ids)
-	    gt_ids_bin = [x % args.num_clusters for x in ids_ints]
-	    np.save("gt_ids_bin.npy", gt_ids_bin)
-	    score = clustering.score_bins(gt_ids_bin, all_classes, args)
-	    print(f"Total_score: {score}")
+        ids_ints = clustering.ids_to_int(all_name_ids)
+        gt_ids_bin = [x % args.num_clusters for x in ids_ints]
+        np.save("gt_ids_bin.npy", gt_ids_bin)
+        score = clustering.score_bins(gt_ids_bin, all_classes, args)
+        print(f"Total_score: {score}")
 
     print(f"Total time: {time.time() - start:.2f}s")
     plt.show()

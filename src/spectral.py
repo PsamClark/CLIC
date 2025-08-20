@@ -1,10 +1,63 @@
+"""bandpass filtering functions
+"""
+
 import numpy as np
 import scipy.stats as stats
 import torch
-import matplotlib.pyplot as plt
 from torchvision.transforms.functional import center_crop
 from skimage.transform import resize
-from skimage.exposure import rescale_intensity
+import skimage.morphology as mph
+import cv2
+
+def binar_image(image, sigma = 3):
+
+    oimage = get_image_outer(image)
+
+    omean = oimage.mean()
+    ostd = oimage.std()
+
+    bin_image = (image >= omean+ostd*sigma) | (image <= omean-ostd*sigma)
+
+    return bin_image
+
+def get_image_outer(image):
+    '''
+    get outer mask of image.
+    '''
+    h, w = image.shape
+    center = (int(w/2), int(h/2))
+    radius = min(center[0], center[1], w-center[0], h-center[1])
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+    mask = dist_from_center <= radius
+    
+    masked_image = np.ma.array(image,mask=mask)
+
+    return masked_image
+
+def tight_mask(image, lpass = 8, dilate_radius = 5, gkern_size = 5):
+
+    """
+    Function to generate tight mask around particle. 
+    """
+
+    #low pass image 
+    filt_image,_ = bandpass_image(image, low = lpass)
+    
+    #get binary image
+    bin_image = binar_image(filt_image)
+
+    # dilate image
+    disc = mph.disk(dilate_radius)
+    dilated_bi = mph.binary_dilation(bin_image, disc)
+
+    #convert binary image to float
+    dbi = dilated_bi.astype(float)
+    
+    #gaussian blur dilated_bi
+    gauss_dbi = cv2.GaussianBlur(dbi, (gkern_size, gkern_size), 0)
+
+    return gauss_dbi
 
 def spectrum1d_sinogram(image):
 
@@ -54,13 +107,12 @@ def bandpass_image(image, low = None, high = None, width = 5, order = 20, pixel_
                    method = "butter",):
     
     
-    image = resize(image, (1024,1024))
     lpass = np.inf
     hpass = 0
 
     spec = spectrum2d(image)
 
-    if ((low is None) and (high is None)) and not boost:
+    if ((low is None) and (high is None)):
         raise ValueError("please select atleast a high or a low filter cutoff.")
 
     if low is not None:
