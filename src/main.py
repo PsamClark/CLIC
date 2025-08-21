@@ -9,36 +9,25 @@ with each particle assigned to a cluster.
 
 Donovan Webb & Yuriy Chaban
 '''
+import argparse
+import os
+import sys
+import random
+import time
+
+# Other dependencies
+import matplotlib.pyplot as plt
 import numpy as np
+
 from sinogram_input import sinogram_main
 from sinogram_input import get_part_locs
 from dim_red import fitmodel
 from clustering import clustering_main
-from plt_truth import plot
+from log import random_string
+from log import store_config, store_images
 import clustering
 import star_writer
-import discrete
 import min_matrix
-import sin_guesser
-import argparse
-
-# Other dependencies
-from skimage.transform import radon, resize
-import mrcfile
-from sklearn.metrics.pairwise import euclidean_distances as eucl_dist
-import matplotlib.pyplot as plt
-from scipy.cluster.hierarchy import dendrogram, fcluster
-import time
-import gemmi
-import os
-import random
-from itertools import permutations
-import numba
-from numba import cuda
-import math
-import collections
-
-import sys
 
 # To silence deprecation warnings
 if not sys.warnoptions:
@@ -47,122 +36,133 @@ if not sys.warnoptions:
 
 parser = argparse.ArgumentParser()
 
-t = ''' Dataset to be considered for clustering. Input path to mrcs
+TEXT = ''' Dataset to be considered for clustering. Input path to mrcs
 stack, to individual mrc particles, or to particle starfile with "/PATH/TO/PARTS/*.mrc"
 (Notes: 1. Don't forget "", 
         2. if star file: run from relion home dir
         3. expects *.mrc or path/to/file.mrcs or path/to/file.star only. 
 '''
-parser.add_argument("-i", "--data_set", help=t, required=True, type=str)
+parser.add_argument("-i", "--data_set", help=TEXT, required=True, type=str)
 
-t = ''' Number of projections to consider total. Defaults to 1000 '''
-parser.add_argument("-n", "--num", help=t, default=1000, type=int)
+TEXT = ''' Number of projections to consider total. Defaults to 1000 '''
+parser.add_argument("-n", "--num", help=TEXT, default=1000, type=int)
 
-t = ''' Batchsize - runs overlapping batches of provided size. This
+TEXT = ''' Batchsize - runs overlapping batches of provided size. This
 speeds up process and requires less memory. Recommended batch size is
 750 < b < 2000'''
-parser.add_argument("-b", "--batch_size", help=t, default=-1, type=int)
+parser.add_argument("-b", "--batch_size", help=TEXT, default=-1, type=int)
 
-t = ''' Downscaling of image prior to making sinograms '''
-parser.add_argument("-d", "--down_scale", help=t, type=int, default = 1)
+TEXT = ''' Downscaling of image prior to making sinograms '''
+parser.add_argument("-d", "--down_scale", help=TEXT, type=int, default = 1)
 
-t = ''' value of image filter highpass resolution '''
-parser.add_argument("-hp", "--highpass", help=t, type=int)
+TEXT = ''' value of image filter highpass resolution '''
+parser.add_argument("-hp", "--highpass", help = TEXT, type=int)
 
-t = ''' value of image filter lowpass resolution '''
-parser.add_argument("-lp", "--lowpass", help=t, default=5, type=int)
+TEXT = ''' value of image filter lowpass resolution '''
+parser.add_argument("-lp", "--lowpass", help = TEXT, default=5, type=int)
 
-t = ''' image filter method '''
-parser.add_argument("-fm", "--filter_method", help=t, default="butter", type=str)
+TEXT = ''' image filter method '''
+parser.add_argument("-fm", "--filter_method", help = TEXT, default="butter", type=str)
 
-t = ''' Number of components of dimensional reduction technique. This
+TEXT = ''' Number of components of dimensional reduction technique. This
 requires some experimentation '''
-parser.add_argument("-c", "--num_comps", help=t, default=10, type=int)
+parser.add_argument("-c", "--num_comps", help = TEXT, default=10, type=int)
 
-t = ''' Dimensional reduction technique.
+TEXT = ''' Dimensional reduction technique.
 options are: PCA, UMAP, TSNE, LLE, ISOMAP, MDS, TRIMAP.
 Recommended: UMAP and PCA. '''
-parser.add_argument("-m", "--model", help=t, default='UMAP', type=str)
+parser.add_argument("-m", "--model", help = TEXT, default='UMAP', type=str)
 
-t = ''' Number of lines in one sinogram (shouldn't need to change
+TEXT = ''' Number of lines in one sinogram (shouldn't need to change
 recommended=120)'''
-parser.add_argument("-l", "--nlines", help=t, default=120, type=int)
+parser.add_argument("-l", "--nlines", help = TEXT, default=120, type=int)
 
-t = ''' Run on gpu with CUDA '''
-parser.add_argument("-g", "--gpu", help=t, default=False, action='store_true')
+TEXT = ''' Run on gpu with CUDA '''
+parser.add_argument("-g", "--gpu", help = TEXT, default=False, action='store_true')
 
-t = ''' Number of clusters '''
-parser.add_argument("-k", "--num_clusters", help=t, default=2, type=int)
+TEXT = ''' Number of clusters '''
+parser.add_argument("-k", "--num_clusters", help = TEXT, default=2, type=int)
 
-t = ''' For testing: Signal to noise ratio to be applied to projection
+TEXT = ''' For testing: Signal to noise ratio to be applied to projection
 before making sinograms '''
-parser.add_argument("-r", "--snr", help=t, default=-1, type=float)
+parser.add_argument("-r", "--snr", help = TEXT, default=-1, type=float)
 
 args = parser.parse_args()
 
 
-def batching(n, b_size):
-    all_n = range(n)
-    if b_size >= n or b_size == -1:
+def batching(size, b_size):
+
+    """Define Batching 
+    """
+    all_n = range(size)
+    if b_size >= size or b_size == -1:
         return [all_n]
-    n_batches = int(np.ceil(2*n/b_size) - 1)
-    num_half = int(np.floor(b_size/2))
-    batches = np.array([np.concatenate((random.sample(range(0, x), num_half), np.array(range(x, x+num_half)))) for x in range(num_half*2, n, num_half)])
-    batches = np.concatenate(([range(0, num_half*2)], batches))
-    if n % (num_half*2) != 0:
-        max_n_arg = int(np.argwhere(batches[-1] == n))
-        batches[-1] = np.concatenate((batches[-1, :max_n_arg], random.sample(range(0, b_size), num_half*2 - max_n_arg)))
-    return batches
+    size_half = int(np.floor(b_size/2))
+    batch_dist = np.array(
+        [np.concatenate(
+            (random.sample(range(0, x), size_half), 
+             np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
+    batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
+    if size % (size_half*2) != 0:
+        max_n_arg = int(np.argwhere(batch_dist[-1] == size))
+        batch_dist[-1] = np.concatenate(
+            (batch_dist[-1, :max_n_arg], random.sample(range(0, b_size), 
+                                                       size_half*2 - max_n_arg)))
+    return batch_dist
 
 
 if __name__ == '__main__':
     start = time.time()
-    clic_dir = f'CLIC_Job_{args.model}_n{args.num}_k{args.num_clusters}_c{args.num_comps}'
-    os.makedirs(clic_dir, exist_ok = True)
 
+    exp_id = random_string(6)
+    EXP_DIR = f"exp_{exp_id}"
+    os.makedirs(EXP_DIR, exist_ok = True)
+    store_config(args,exp_id)
     part_locs, n = get_part_locs(args) 
     batches = batching(n, args.batch_size)
 
-    with open(f"{clic_dir}/particle_ids.txt", "w") as fl:
+    with open(f"{EXP_DIR}/particle_ids.txt", "w") as fl:
         for line in part_locs:
             fl.write(f"{line}\n")
 
     all_name_ids = []
-    b = 0
+    B = 0
     matrix = np.zeros((len(batches), n, args.num_clusters))
     for batch in batches:
         start_batch = time.time()
-        batch_dir = f'{clic_dir}/batch_{b}'
-        os.makedirs(batch_dir, exist_ok = True)
-        print(f"### Running batch {b+1} of {len(batches)} with size {len(batch)} particles ###")
+        BATCH_DIR = f'{EXP_DIR}/batch_{B}'
+        os.makedirs(BATCH_DIR, exist_ok = True)
+        print(f"### Running batch {B+1} of {len(batches)} with size {len(batch)} particles ###")
 
-        all_ims, num, name_ids = sinogram_main(args, part_locs, batch)
+        all_sinos, all_ims, num, name_ids = sinogram_main(args, part_locs, batch)
+        if B == 0:
+            store_images(all_ims, all_sinos, name_ids, EXP_DIR)
         for name_id in name_ids:
             if name_id not in all_name_ids:
                 all_name_ids.append(name_id)
-        star_file  = star_writer.create(name_ids, batch_dir)
+        star_file  = star_writer.create(name_ids, BATCH_DIR)
 
         args.num = num  # Update with lowest num
-        lines_reddim, model = fitmodel(all_ims, args.model, args.num_comps)
+        lines_reddim, model = fitmodel(all_sinos, args.model, args.num_comps)
 
 
-        batch_classes = clustering_main(lines_reddim, args, batch_dir, name_ids)
-        matrix[b] = min_matrix.make_slice(batch_classes, batch, matrix.shape)
+        batch_classes = clustering_main(lines_reddim, args, BATCH_DIR, name_ids)
+        matrix[B] = min_matrix.make_slice(batch_classes, batch, matrix.shape)
         print(f"   Batch time: {time.time() - start_batch:.2f}s")
-        b += 1
+        B += 1
 
-    np.save(f"{clic_dir}matrix.npy", matrix)
+    np.save(f"{EXP_DIR}/cluster_matrix.npy", matrix)
     aligned_matrix = min_matrix.align_batches(matrix)
     all_classes = min_matrix.make_line(aligned_matrix)
 
     # Score classes in testing. input alternates between classes. i.e. classes  0101010101...
-    binary_test = False
-    if binary_test == True:
-	    ids_ints = clustering.ids_to_int(all_name_ids)
-	    gt_ids_bin = [x % args.num_clusters for x in ids_ints]
-	    np.save("gt_ids_bin.npy", gt_ids_bin)
-	    score = clustering.score_bins(gt_ids_bin, all_classes, args)
-	    print(f"Total_score: {score}")
+    BINARY_TEST = False
+    if BINARY_TEST:
+        ids_ints = clustering.ids_to_int(all_name_ids)
+        gt_ids_bin = [x % args.num_clusters for x in ids_ints]
+        np.save("gt_ids_bin.npy", gt_ids_bin)
+        score = clustering.score_bins(gt_ids_bin, all_classes, args)
+        print(f"Total_score: {score}")
 
     print(f"Total time: {time.time() - start:.2f}s")
     plt.show()

@@ -4,14 +4,14 @@ output: matrix containing sinograms from given dataset
 
 This script loads projections, adds noise and translation (for testing), masks, makes sinograms
 """
+import random
 import numpy as np
 from skimage.transform import radon, resize
 import mrcfile
 import gemmi
-import entropy_filter
-import random
-import spectral
 import cv2
+
+from spectral import bandpass_image, tight_mask
 
 
 def load_mrc(path):
@@ -88,16 +88,17 @@ def find_im_size(path):
 
 def gblur(im):
     ''' Adds gaussian blur to projection '''
-    import cv2
     kernel = 5
     im = cv2.GaussianBlur(im, (kernel, kernel),0)
     return im
 
 
-def pre_process(im, config, n, ds_size):
+def pre_process(im, config, ds_size):
     if config.snr != -1:  # for testing
         im = add_noise(im, config.snr)
-    im,_ = spectral.bandpass_image(im, low=config.lowpass,
+    mask = tight_mask(im)
+    im = im*mask
+    im,_ = bandpass_image(im, low=config.lowpass,
                                  high = config.highpass, method = config.filter_method)
     im = downscale(im, ds_size)
     im = stand_image(im)
@@ -105,7 +106,7 @@ def pre_process(im, config, n, ds_size):
     im = circular_mask(im)
 
     sino = make_sinogram(im, config.nlines)
-    return sino
+    return sino,im
 
 
 def get_part_locs(config):
@@ -119,14 +120,14 @@ def get_part_locs(config):
         import glob
         part_locs = glob.glob(dset_path)
         n_max = len(part_locs)
-        if part_locs == []:
+        if len(part_locs) == 0:
             print(f"Error: No mrc found in: {dset_path}")
             exit()
     elif dset_path.endswith('star'):
         # read star file to extract im locs
         starfile = gemmi.cif.read_file(dset_path)
         block = starfile.find_block('particles')
-        part_locs = [x for x in block.find_values(f'_rlnimagename')]
+        part_locs = [x for x in block.find_values('_rlnimagename')]
         n_max = len(part_locs)
         # need error handling here
 
@@ -140,7 +141,10 @@ def get_part_locs(config):
     return part_locs, n
     
 
-def open_part(x, part_locs, name_ids, dset_path, stacks={}):
+def open_part(x, part_locs, name_ids, dset_path, stacks=None):
+
+    if stacks is None:
+        stacks={}
     if dset_path.endswith('.mrcs'):
         im = part_locs[x]
         name_ids.append(f'{x+1}@{dset_path}')
@@ -167,7 +171,7 @@ def open_part(x, part_locs, name_ids, dset_path, stacks={}):
             im = stack[int(ind) - 1]  # Rln stack starts at 1!
         name_ids.append(f'{im_loc}')
 
-    return im, name_ids, stacks
+    return im, name_ids
 
 def sinogram_main(config, part_locs, subset):
 
@@ -175,15 +179,17 @@ def sinogram_main(config, part_locs, subset):
     subsize = len(subset)
     for x in range(len(subset)):
         x_sb = subset[x]
-        im, name_ids, stacks = open_part(x_sb, part_locs, name_ids, config.data_set)
+        im, name_ids = open_part(x_sb, part_locs, name_ids, config.data_set)
 
         if x == 0:  # first pass makes all_sinos
             print(im.shape[0])
             print(config.down_scale)
             ds_size = im.shape[0] // config.down_scale
             all_sinos = np.zeros((subsize, config.nlines, ds_size))
+            all_ims = np.zeros((subsize,ds_size,ds_size))
 
-        sino = pre_process(im, config, x_sb, ds_size)
+        sino,imout = pre_process(im, config, ds_size)
         all_sinos[x] = sino
+        all_ims[x] = imout
 
-    return all_sinos, subsize, name_ids
+    return all_sinos,all_ims, subsize, name_ids
