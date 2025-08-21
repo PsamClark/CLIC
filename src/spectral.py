@@ -163,7 +163,6 @@ def bpfilter(image, low = np.inf, high = 0, width = 5, order = 20, method = "but
 
 
 def bp_gauss(mask, low, high, width):
-    print(low, high)
     centre = [mask.shape[0]//2, mask.shape[1]//2]
 
     for i in range(mask.shape[0]):
@@ -171,7 +170,6 @@ def bp_gauss(mask, low, high, width):
         for j in range(mask.shape[1]):
 
             relpos = np.sqrt((i-centre[0])**2+(j-centre[1])**2)
-            #print(relpos)
 
             if relpos > low:
 
@@ -210,6 +208,5 @@ def bp_butter(mask, low, high, order):
         bwidth = low - high
 
         bmid = (low + high)/2
-    print(bwidth,bmid)
     mask = np.divide(1,np.sqrt(1 + ((sq - (bmid - 1))/(bwidth/2))**(2*order)))
     return mask

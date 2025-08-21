@@ -93,7 +93,7 @@ def gblur(im):
     return im
 
 
-def pre_process(im, config, n, ds_size):
+def pre_process(im, config, ds_size):
     if config.snr != -1:  # for testing
         im = add_noise(im, config.snr)
     mask = tight_mask(im)
@@ -120,7 +120,7 @@ def get_part_locs(config):
         import glob
         part_locs = glob.glob(dset_path)
         n_max = len(part_locs)
-        if part_locs == []:
+        if len(part_locs) == 0:
             print(f"Error: No mrc found in: {dset_path}")
             exit()
     elif dset_path.endswith('star'):
@@ -188,7 +188,7 @@ def sinogram_main(config, part_locs, subset):
             all_sinos = np.zeros((subsize, config.nlines, ds_size))
             all_ims = np.zeros((subsize,ds_size,ds_size))
 
-        sino,imout = pre_process(im, config, x_sb, ds_size)
+        sino,imout = pre_process(im, config, ds_size)
         all_sinos[x] = sino
         all_ims[x] = imout
 
