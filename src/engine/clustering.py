@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import  fcluster
 from numba import cuda
 
-from ..io.star_writer import end_write, update_data
+from inout.star_writer import end_write, update_data
 
 
 def initial_dict(lines, num):

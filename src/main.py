@@ -35,13 +35,13 @@ import time
 
 import numpy as np
 
-from io.sinogram_input import sinogram_main
-from io.sinogram_input import get_part_locs
+from inout.sinogram_input import sinogram_main
+from inout.sinogram_input import get_part_locs
 from engine.dim_red import fitmodel
 from engine.clustering import clustering_main
-from io.log import random_string
-from io.log import store_config, store_images
-from io.star_writer import create
+from inout.log import random_string
+from inout.log import store_config, store_images
+from inout.star_writer import create
 from utils.min_matrix import make_slice
 
 # To silence deprecation warnings
