@@ -1,33 +1,48 @@
 #!/usr/bin/env python
-'''
-Main file for CLIC 3D heterogeneity sorting algorithm.  Config options
-are passed by arguments and the job pipeline to be run can be seen at
-the bottom of the file.
+"""
+main.py
 
-Results: A dendrogram of each batch is made.  Output of star files
-with each particle assigned to a cluster.
+Main entry point for the CLIC 3D heterogeneity sorting algorithm.
 
-Donovan Webb & Yuriy Chaban
-'''
+This script orchestrates the pipeline for clustering 3D cryo-EM particle data using sinogram-based
+dimensionality reduction and stepwise clustering. It supports batch processing, configuration via
+command-line arguments, and outputs dendrograms and cluster assignments for each particle.
+
+Key Components:
+    - Argument parsing for configuration.
+    - Batch processing of particles.
+    - Sinogram generation and dimensionality reduction.
+    - Stepwise clustering and dendrogram visualization.
+    - Output of cluster assignments and results.
+
+Usage:
+    Run this script from the command line with the required arguments:
+        python main.py -i <input_data> [other options]
+
+Example:
+    python main.py -i particles.star -n 1000 -b 750 -c 10 -m UMAP
+
+Authors:
+    Donovan Webb & Yuriy Chaban
+"""
+
+# Other dependencies
 import argparse
 import os
 import sys
 import random
 import time
 
-# Other dependencies
-import matplotlib.pyplot as plt
 import numpy as np
 
-from sinogram_input import sinogram_main
-from sinogram_input import get_part_locs
-from dim_red import fitmodel
-from clustering import clustering_main
-from log import random_string
-from log import store_config, store_images
-import clustering
-import star_writer
-import min_matrix
+from io.sinogram_input import sinogram_main
+from io.sinogram_input import get_part_locs
+from engine.dim_red import fitmodel
+from engine.clustering import clustering_main
+from io.log import random_string
+from io.log import store_config, store_images
+from io.star_writer import create
+from utils.min_matrix import make_slice
 
 # To silence deprecation warnings
 if not sys.warnoptions:
@@ -38,9 +53,9 @@ parser = argparse.ArgumentParser()
 
 TEXT = ''' Dataset to be considered for clustering. Input path to mrcs
 stack, to individual mrc particles, or to particle starfile with "/PATH/TO/PARTS/*.mrc"
-(Notes: 1. Don't forget "", 
+(Notes: 1. Don't forget "",
         2. if star file: run from relion home dir
-        3. expects *.mrc or path/to/file.mrcs or path/to/file.star only. 
+        3. expects *.mrc or path/to/file.mrcs or path/to/file.star only.
 '''
 parser.add_argument("-i", "--data_set", help=TEXT, required=True, type=str)
 
@@ -91,8 +106,15 @@ args = parser.parse_args()
 
 
 def batching(size, b_size):
+    """
+    Defines batching of data indices for processing.
 
-    """Define Batching 
+    Args:
+        size (int): Total number of items to batch.
+        b_size (int): Desired batch size.
+
+    Returns:
+        list: List of numpy arrays or ranges, each representing a batch of indices.
     """
     all_n = range(size)
     if b_size >= size or b_size == -1:
@@ -100,69 +122,64 @@ def batching(size, b_size):
     size_half = int(np.floor(b_size/2))
     batch_dist = np.array(
         [np.concatenate(
-            (random.sample(range(0, x), size_half), 
+            (random.sample(range(0, x), size_half),
              np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
     batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
     if size % (size_half*2) != 0:
         max_n_arg = int(np.argwhere(batch_dist[-1] == size))
         batch_dist[-1] = np.concatenate(
-            (batch_dist[-1, :max_n_arg], random.sample(range(0, b_size), 
+            (batch_dist[-1, :max_n_arg], random.sample(range(0, b_size),
                                                        size_half*2 - max_n_arg)))
     return batch_dist
 
-
-if __name__ == '__main__':
+def main(arguments):
+    """ 
+    Main function to run the CLIC clustering pipeline.
+    Args:
+        arguments: Parsed command-line arguments.
+    """
     start = time.time()
 
     exp_id = random_string(6)
-    EXP_DIR = f"exp_{exp_id}"
-    os.makedirs(EXP_DIR, exist_ok = True)
-    store_config(args,exp_id)
-    part_locs, n = get_part_locs(args) 
-    batches = batching(n, args.batch_size)
+    exp_dir = f"exp_{exp_id}"
+    os.makedirs(exp_dir, exist_ok = True)
+    store_config(arguments,exp_id)
+    part_locs, n = get_part_locs(arguments)
+    batches = batching(n, arguments.batch_size)
 
-    with open(f"{EXP_DIR}/particle_ids.txt", "w") as fl:
+    with open(f"{exp_dir}/particle_ids.txt", "w") as fl:
         for line in part_locs:
             fl.write(f"{line}\n")
 
     all_name_ids = []
-    B = 0
-    matrix = np.zeros((len(batches), n, args.num_clusters))
+    b = 0
+    matrix = np.zeros((len(batches), n, arguments.num_clusters))
     for batch in batches:
         start_batch = time.time()
-        BATCH_DIR = f'{EXP_DIR}/batch_{B}'
-        os.makedirs(BATCH_DIR, exist_ok = True)
-        print(f"### Running batch {B+1} of {len(batches)} with size {len(batch)} particles ###")
+        batch_dir = f'{exp_dir}/batch_{b}'
+        os.makedirs(batch_dir, exist_ok = True)
+        print(f"### Running batch {b+1} of {len(batches)} with size {len(batch)} particles ###")
 
-        all_sinos, all_ims, num, name_ids = sinogram_main(args, part_locs, batch)
-        if B == 0:
-            store_images(all_ims, all_sinos, name_ids, EXP_DIR)
+        all_sinos, all_ims, num, name_ids = sinogram_main(arguments, part_locs, batch)
+        if b == 0:
+            store_images(all_ims, all_sinos, name_ids, exp_dir)
         for name_id in name_ids:
             if name_id not in all_name_ids:
                 all_name_ids.append(name_id)
-        star_file  = star_writer.create(name_ids, BATCH_DIR)
+        create(name_ids, batch_dir)
 
-        args.num = num  # Update with lowest num
-        lines_reddim, model = fitmodel(all_sinos, args.model, args.num_comps)
+        arguments.num = num  # Update with lowest num
+        lines_reddim, _ = fitmodel(all_sinos, arguments.model, arguments.num_comps)
 
 
-        batch_classes = clustering_main(lines_reddim, args, BATCH_DIR, name_ids)
-        matrix[B] = min_matrix.make_slice(batch_classes, batch, matrix.shape)
+        batch_classes = clustering_main(lines_reddim, arguments, batch_dir, name_ids)
+        matrix[b] = make_slice(batch_classes, batch, matrix.shape)
         print(f"   Batch time: {time.time() - start_batch:.2f}s")
-        B += 1
+        b += 1
 
-    np.save(f"{EXP_DIR}/cluster_matrix.npy", matrix)
-    aligned_matrix = min_matrix.align_batches(matrix)
-    all_classes = min_matrix.make_line(aligned_matrix)
+    np.save(f"{exp_dir}/cluster_matrix.npy", matrix)
+    print(f"### Total time: {time.time() - start:.2f}s ###")
 
-    # Score classes in testing. input alternates between classes. i.e. classes  0101010101...
-    BINARY_TEST = False
-    if BINARY_TEST:
-        ids_ints = clustering.ids_to_int(all_name_ids)
-        gt_ids_bin = [x % args.num_clusters for x in ids_ints]
-        np.save("gt_ids_bin.npy", gt_ids_bin)
-        score = clustering.score_bins(gt_ids_bin, all_classes, args)
-        print(f"Total_score: {score}")
 
-    print(f"Total time: {time.time() - start:.2f}s")
-    plt.show()
+if __name__ == '__main__':
+    main(args)

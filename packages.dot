@@ -1,0 +1,28 @@
+digraph "packages" {
+rankdir=BT
+charset="utf-8"
+"CLIC" [color="black", label=<CLIC>, shape="box", style="solid"];
+"CLIC.src" [color="black", label=<CLIC.src>, shape="box", style="solid"];
+"CLIC.src.analysis" [color="black", label=<CLIC.src.analysis>, shape="box", style="solid"];
+"CLIC.src.analysis.metrics" [color="black", label=<CLIC.src.analysis.metrics>, shape="box", style="solid"];
+"CLIC.src.analysis.pca_recon" [color="black", label=<CLIC.src.analysis.pca_recon>, shape="box", style="solid"];
+"CLIC.src.engine" [color="black", label=<CLIC.src.engine>, shape="box", style="solid"];
+"CLIC.src.engine.clustering" [color="black", label=<CLIC.src.engine.clustering>, shape="box", style="solid"];
+"CLIC.src.engine.dim_red" [color="black", label=<CLIC.src.engine.dim_red>, shape="box", style="solid"];
+"CLIC.src.io" [color="black", label=<CLIC.src.io>, shape="box", style="solid"];
+"CLIC.src.io.classes_star" [color="black", label=<CLIC.src.io.classes_star>, shape="box", style="solid"];
+"CLIC.src.io.log" [color="black", label=<CLIC.src.io.log>, shape="box", style="solid"];
+"CLIC.src.io.sinogram_input" [color="black", label=<CLIC.src.io.sinogram_input>, shape="box", style="solid"];
+"CLIC.src.io.star_writer" [color="black", label=<CLIC.src.io.star_writer>, shape="box", style="solid"];
+"CLIC.src.main" [color="black", label=<CLIC.src.main>, shape="box", style="solid"];
+"CLIC.src.utils" [color="black", label=<CLIC.src.utils>, shape="box", style="solid"];
+"CLIC.src.utils.cutter" [color="black", label=<CLIC.src.utils.cutter>, shape="box", style="solid"];
+"CLIC.src.utils.min_matrix" [color="black", label=<CLIC.src.utils.min_matrix>, shape="box", style="solid"];
+"CLIC.src.utils.spectral" [color="black", label=<CLIC.src.utils.spectral>, shape="box", style="solid"];
+"CLIC.src.main" -> "CLIC.src.engine.clustering" [arrowhead="open", arrowtail="none"];
+"CLIC.src.main" -> "CLIC.src.engine.dim_red" [arrowhead="open", arrowtail="none"];
+"CLIC.src.main" -> "CLIC.src.io.log" [arrowhead="open", arrowtail="none"];
+"CLIC.src.main" -> "CLIC.src.io.sinogram_input" [arrowhead="open", arrowtail="none"];
+"CLIC.src.main" -> "CLIC.src.io.star_writer" [arrowhead="open", arrowtail="none"];
+"CLIC.src.main" -> "CLIC.src.utils.min_matrix" [arrowhead="open", arrowtail="none"];
+}
