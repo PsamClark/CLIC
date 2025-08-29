@@ -163,7 +163,7 @@ def find_scoretable(cluster_dict, cluster_labels):
 
 
 @cuda.jit
-def find_sctbl_cuda(a, d):
+def find_sctbl_cuda(a,b, d):
     """
     Compute the score table using CUDA for acceleration.
 
@@ -188,6 +188,7 @@ def find_sctbl_cuda(a, d):
                 for x,l in enumerate(l1):
                     dist += (l - l2[x])**2
                 dist = math.sqrt(dist)
+                b[i,j,iter1,iter2] = dist
                 tot_score += 1/dist
         a[i, j] = tot_score
 
@@ -467,18 +468,26 @@ def clustering_main(lines, config, clic_dir, ids):
             np.ascontiguousarray(lines),
             (config.num, config.nlines, config.num_comps))
         scoretable = np.zeros((config.num, config.num), dtype=np.float32)
+        
+        disttable = np.zeros((config.num, config.num, lines.shape[-1],lines), dtype=np.float32)
+
         # data to device
         d_sinos = cuda.to_device(sinos)
         d_scoretable = cuda.to_device(scoretable)
+        d_disttable = cuda.to_device(disttable)
         # Set up enough threads for kernel
         threadsperblock = (32, 32)
         blockspergrid_x = (config.num + threadsperblock[0]) // threadsperblock[0]
         blockspergrid_y = (config.num + threadsperblock[1]) // threadsperblock[1]
         blockspergrid = (blockspergrid_x, blockspergrid_y)
-        find_sctbl_cuda[blockspergrid, threadsperblock](d_scoretable, d_sinos)
+        find_sctbl_cuda[blockspergrid, threadsperblock](d_scoretable, d_disttable, d_sinos)
         scoretable = d_scoretable.copy_to_host()
+        disttable = d_disttable.copy_to_host()
+
     else:
         scoretable = find_scoretable(cl_dict, cl_labels)  # old method
+
+    np.save(disttable, f"{clic_dir}/disttable.npy")
     # Normalize scoretable
     scoretable = center_sctble(scoretable)
     # print(f"   sctable time: {(time.time() - timer_sc_tbl)}")
