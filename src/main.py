@@ -34,13 +34,14 @@ import random
 import time
 
 import numpy as np
+import joblib
 
 from inout.sinogram_input import sinogram_main
 from inout.sinogram_input import get_part_locs
 from engine.dim_red import fitmodel
 from engine.clustering import clustering_main
-from inout.log import random_string
-from inout.log import store_config, store_images
+from log import random_string
+from log import store_config, store_images
 from inout.star_writer import create
 from utils.min_matrix import make_slice
 
@@ -76,17 +77,23 @@ parser.add_argument("-hp", "--highpass", help = TEXT, type=int)
 TEXT = ''' value of image filter lowpass resolution '''
 parser.add_argument("-lp", "--lowpass", help = TEXT, default=5, type=int)
 
+TEXT = '''apply tightmask before filtering'''
+parser.add_argument("-tm", "--tightmask", help = TEXT, default=False, action='store_true')
+
 TEXT = ''' image filter method '''
 parser.add_argument("-fm", "--filter_method", help = TEXT, default="butter", type=str)
 
 TEXT = ''' Number of components of dimensional reduction technique. This
 requires some experimentation '''
-parser.add_argument("-c", "--num_comps", help = TEXT, default=10, type=int)
+parser.add_argument("-c", "--num_comps", help = TEXT, default=None, type=int)
 
 TEXT = ''' Dimensional reduction technique.
 options are: PCA, UMAP, TSNE, LLE, ISOMAP, MDS, TRIMAP.
 Recommended: UMAP and PCA. '''
 parser.add_argument("-m", "--model", help = TEXT, default='UMAP', type=str)
+
+TEXT = ''' Save Model'''
+parser.add_argument("-s", "--save_model", help = TEXT, default=False, action='store_true')
 
 TEXT = ''' Number of lines in one sinogram (shouldn't need to change
 recommended=120)'''
@@ -169,8 +176,17 @@ def main(arguments):
         create(name_ids, batch_dir)
 
         arguments.num = num  # Update with lowest num
-        lines_reddim, _ = fitmodel(all_sinos, arguments.model, arguments.num_comps)
 
+        if args.num_comps is not None:
+            lines_reddim, model = fitmodel(all_sinos, arguments.model, arguments.num_comps)
+            if args.save_model:
+                joblib.dump(model,f"{batch_dir}/dimred.mod")
+                
+
+        else:
+            lines_reddim = all_sinos
+            arguments.num_comps = all_sinos.shape[-1]
+        
 
         batch_classes = clustering_main(lines_reddim, arguments, batch_dir, name_ids)
         matrix[b] = make_slice(batch_classes, batch, matrix.shape)

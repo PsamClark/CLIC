@@ -32,9 +32,9 @@ def create(ids: List[str], clic_dir: str) -> gemmi.cif.Document:
     tags = ['_id', '_rlnimagename']
     loop = block.init_loop('', tags)
 
-    loop.add_row(['-1', 'z_score'])  # Header row for z-scores
+    loop.add_row([f'-1\t', f'z_score\t'])  # z scores
     for x in range(1, len(ids)):
-        loop.add_row([str(x), ids[x]])
+        loop.add_row([f'{x}\t', f'{ids[x]}\t'])
 
     out_doc.write_file(f'{clic_dir}/particles.star')
 
@@ -55,7 +55,7 @@ def update_data(tags: List[str], labels: List[str], table: List[List[str]], it: 
     """
     tags.append(f'_it{it}')
     for i, row in enumerate(table):
-        row[it] = labels[i]
+        row[it] = f'{labels[i]}\t'
     return tags, table
 
 
@@ -75,10 +75,14 @@ def end_write(tags: List[str], table: List[List[str]],
     block = new_doc.add_new_block('particles')
     loop = block.init_loop('', tags)
 
-    loop.add_row(['-', 'z_score'] + z_score_list)
+    row1 = ['-', 'z_score']
+
+    row1.extend(z_score_list)
+    loop.add_row(row1)
 
     for x, ent in enumerate(ids):
-        row = [str(x), ent] + table[x]
+        row = [f'{x}\t', f'{ent}\t'] 
+        row.extend(table[x])       
         loop.add_row(row)
 
     new_doc.write_file(f'{clic_dir}/particles_CLIC.star')
@@ -110,14 +114,14 @@ def update(star_file: gemmi.cif.Document, labels: List[str], it: int,
 
     # Add z-score row
     row = list(table[0])
-    row.append(z_score)
+    row.append(f'{z_score}')
     loop.add_row(row)
 
     tot_time = 0
     for i in range(1, len(table)):
         st_time = time.time()
         new_row = list(table[i])
-        new_row.append(labels[i])
+        new_row.append(f'{labels[i]}\t')
         loop.add_row(new_row)
         tot_time += time.time() - st_time
 

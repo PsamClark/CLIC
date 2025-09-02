@@ -189,9 +189,10 @@ def pre_process(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, 
     """
     if config.snr != -1:
         im = add_noise(im, config.snr)
-    mask = tight_mask(im)
-    im = im*mask
-    del mask
+    if config.tightmask:
+        mask = tight_mask(im)
+        im = im*mask
+        del mask
     im, _ = bandpass_image(
         im, low=config.lowpass, high=config.highpass,
         method=config.filter_method

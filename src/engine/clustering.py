@@ -461,6 +461,7 @@ def clustering_main(lines, config, clic_dir, ids):
         np.ndarray or None: Final cluster assignments if num_clusters is set,
         else None.
     """
+    print(lines.shape)
     cl_labels = list(range(config.num))
     cl_dict = initial_dict(lines, config.num)
     if config.gpu:
@@ -469,12 +470,13 @@ def clustering_main(lines, config, clic_dir, ids):
             (config.num, config.nlines, config.num_comps))
         scoretable = np.zeros((config.num, config.num), dtype=np.float32)
         
-        disttable = np.zeros((config.num, config.num, lines.shape[-1],lines), dtype=np.float32)
+        disttable = np.zeros((config.num, config.num, sinos.shape[1],sinos.shape[1]), dtype=np.float32)
 
         # data to device
         d_sinos = cuda.to_device(sinos)
         d_scoretable = cuda.to_device(scoretable)
         d_disttable = cuda.to_device(disttable)
+        
         # Set up enough threads for kernel
         threadsperblock = (32, 32)
         blockspergrid_x = (config.num + threadsperblock[0]) // threadsperblock[0]
@@ -487,7 +489,7 @@ def clustering_main(lines, config, clic_dir, ids):
     else:
         scoretable = find_scoretable(cl_dict, cl_labels)  # old method
 
-    np.save(disttable, f"{clic_dir}/disttable.npy")
+    np.save(f"{clic_dir}/disttable.npy",disttable)
     # Normalize scoretable
     scoretable = center_sctble(scoretable)
     # print(f"   sctable time: {(time.time() - timer_sc_tbl)}")
@@ -514,8 +516,8 @@ def clustering_main(lines, config, clic_dir, ids):
                 clusters, count, large_merges, paired, config, z_score)
 
         z_score_list.append(f'{z_score}')
+        
         tags, table = update_data(tags, cl, table, i)
-
 
     end_write(tags, table, z_score_list, clic_dir, ids)
 

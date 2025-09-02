@@ -104,7 +104,7 @@ def align_batches(matrix: np.ndarray) -> np.ndarray:
         opt_perm = perm_list[np.argmax(scores)]
 
         opt_batch = np.zeros((n, d), dtype=int)
-        for i, _ in enumerate(n):
+        for i in range(n):
             one_hot = batch[i]
             if 1 in one_hot:
                 unshift_c = np.argmax(one_hot)
