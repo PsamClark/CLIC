@@ -41,6 +41,9 @@ def cluster_accuracy(cc_piv: pd.DataFrame) -> float:
     Returns:
         Accuracy as a percentage.
     """
+    if cc_piv is None:
+        return None
+
     cc_vals = cc_piv.values
     total = np.sum(cc_vals)
 
@@ -68,7 +71,11 @@ def optimize_clustering(clic_exp: str) -> pd.DataFrame:
     Returns:
         Pivot table of class counts per experiment ID.
     """
-    data = np.load(f"{clic_exp}/cluster_matrix.npy")
+    try:
+        data = np.load(f"{clic_exp}/cluster_matrix.npy")
+    except:
+        return None
+
     aligned_matrix = align_batches(data)
     all_classes = make_line(aligned_matrix)
 

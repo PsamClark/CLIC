@@ -188,7 +188,9 @@ def find_sctbl_cuda(a,b, d):
                 for x,l in enumerate(l1):
                     dist += (l - l2[x])**2
                 dist = math.sqrt(dist)
-                b[i,j,iter1,iter2] = dist
+
+                if b.ndim>1:
+                    b[i,j,iter1,iter2] = dist
                 tot_score += 1/dist
         a[i, j] = tot_score
 
@@ -461,7 +463,6 @@ def clustering_main(lines, config, clic_dir, ids):
         np.ndarray or None: Final cluster assignments if num_clusters is set,
         else None.
     """
-    print(lines.shape)
     cl_labels = list(range(config.num))
     cl_dict = initial_dict(lines, config.num)
     if config.gpu:
@@ -469,8 +470,13 @@ def clustering_main(lines, config, clic_dir, ids):
             np.ascontiguousarray(lines),
             (config.num, config.nlines, config.num_comps))
         scoretable = np.zeros((config.num, config.num), dtype=np.float32)
+        disttable = np.array([])
         
-        disttable = np.zeros((config.num, config.num, sinos.shape[1],sinos.shape[1]), dtype=np.float32)
+        save_dists = False
+
+        if save_dists:
+
+            disttable = np.zeros((config.num, config.num, sinos.shape[1],sinos.shape[1]), dtype=np.float32)
 
         # data to device
         d_sinos = cuda.to_device(sinos)
@@ -489,7 +495,8 @@ def clustering_main(lines, config, clic_dir, ids):
     else:
         scoretable = find_scoretable(cl_dict, cl_labels)  # old method
 
-    np.save(f"{clic_dir}/disttable.npy",disttable)
+    if disttable is not None:
+        np.save(f"{clic_dir}/disttable.npy",disttable)
     # Normalize scoretable
     scoretable = center_sctble(scoretable)
     # print(f"   sctable time: {(time.time() - timer_sc_tbl)}")

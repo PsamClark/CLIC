@@ -178,8 +178,11 @@ def main(arguments):
         arguments.num = num  # Update with lowest num
 
         if args.num_comps is not None:
-            lines_reddim, model = fitmodel(all_sinos, arguments.model, arguments.num_comps)
+            lines_reddim, mod_fit, model = fitmodel(all_sinos, arguments.model, arguments.num_comps)
+
             if args.save_model:
+                np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
+                np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
                 
 

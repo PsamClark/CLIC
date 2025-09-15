@@ -86,16 +86,17 @@ def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int
     elif model_choice == 'TSNE':
         model = TSNE(n_components=num_comps)
     elif model_choice == 'UMAP':
-       model = UMAP(n_neighbors=5, min_dist=0.3, n_components=num_comps)
+       model = UMAP(n_neighbors=5, min_dist=0.3, n_components=num_comps,random_state=42)
     elif model_choice == 'TRIMAP':
         model = TRIMAP(n_iters=1000)
 
     lines = split_sinos(sinos)
-    sinos_trans = model.fit_transform(lines)
+    mod_fit = model.fit(lines)
+    sinos_trans = model.transform(lines)
 
     comp_var(sinos_trans)
 
     if model_choice == 'PCA_skip':
         sinos_trans = sinos_trans[:, 1:]
 
-    return sinos_trans, model
+    return sinos_trans, mod_fit, model

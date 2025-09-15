@@ -112,12 +112,15 @@ def collate_scores() -> None:
     out_list: List[List[Any]] = []
 
     for exp_conf in experiments:
+        
         exp_id = Path(exp_conf).stem
-
+        print(exp_id)
         with open(exp_conf, "r") as conffile:
             config = json.load(conffile)
 
         score = score_clustering(exp_id)
+        if score is None:
+            continue
         features, out_list = pop_features(config, score, out_list, exp_id)
 
     features.append("accuracy")
@@ -173,7 +176,6 @@ def pop_features(config: Dict[str, Any], score: float,
             - out_list: Updated list of experiment results.
     """
     features, values = get_dict_entries(config)
-    print(score)
     values.append(score)
     values.insert(0, exp_id)
     out_list.append(values)
