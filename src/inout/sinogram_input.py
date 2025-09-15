@@ -78,7 +78,7 @@ def add_noise(image: np.ndarray, snr: float = 1) -> np.ndarray:
         Noisy image.
     """
     sigma = np.sqrt(np.var(image) / snr)
-    noise = np.random.normal(0, sigma, image.shape)
+    noise = rng.normal(0, sigma, image.shape)
     return image + noise
 
 
@@ -203,9 +203,44 @@ def pre_process(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, 
     sino = make_sinogram(im, config.nlines)
     return sino, im
 
-
-def get_part_locs(config: Any) -> Tuple[Any, int]:
+def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
     """
+    Check if dataset path points to multiple .mrcs files.
+
+    Args:
+        dset_path: Dataset path.
+
+    Returns:
+        1 if multiple .mrcs files, else 0.
+    """
+
+    files = [i.strip('\n') for  i in open(dset_path, 'r').readlines()]
+
+    nsub = ntot // len(files)
+
+    for f,file in  enumerate(files):
+
+        with mrcfile.open(file,'r') as mfile:
+
+            mdata = mfile.data[rng.randint(len(mfile.data),size = nsub)]
+        ids = [file]*nsub
+        print(ids)
+        if f == 0: 
+            mdata_out = mdata
+            ids_out = ids
+
+        else:
+
+            mdata_out = np.concat((mdata_out,mdata))
+
+            ids_out.extend(ids)
+        #print(ids_out)
+    
+    return (mdata_out,ids_out), nsub*3
+
+    
+def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
+    """  
     Load particle locations from dataset path.
 
     Args:
@@ -216,19 +251,23 @@ def get_part_locs(config: Any) -> Tuple[Any, int]:
     """
     dset_path = config.data_set
 
-    if dset_path.endswith('.mrcs'):
+    if dset_path.endswith('.txt'):
+
+        part_locs, n_max = multi_mrcs(dset_path,config.num,rng)
+
+    elif dset_path.endswith('.mrcs'):
         with mrcfile.open(dset_path) as f:
             part_locs = f.data
         n_max = part_locs.shape[0]
 
-    elif dset_path.endswith('mrc'):
+    elif dset_path.endswith('.mrc'):
         part_locs = glob(dset_path)
         n_max = len(part_locs)
         if n_max == 0:
             print(f"Error: No mrc found in: {dset_path}")
             sys.exit()
 
-    elif dset_path.endswith('star'):
+    elif dset_path.endswith('.star'):
         starfile = gemmi.cif.read_file(dset_path)
         block = starfile.find_block('particles')
         part_locs = list(block.find_values('_rlnimagename'))
@@ -261,7 +300,12 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
     if stacks is None:
         stacks = {}
 
-    if dset_path.endswith('.mrcs'):
+    if dset_path.endswith('.txt'):
+
+        im = part_locs[0][x]
+        name_ids.append(part_locs[1][x])
+
+    elif dset_path.endswith('.mrcs'):
         im = part_locs[x]
         name_ids.append(f'{x+1}@{dset_path}')
 

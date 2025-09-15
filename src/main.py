@@ -109,10 +109,9 @@ TEXT = ''' For testing: Signal to noise ratio to be applied to projection
 before making sinograms '''
 parser.add_argument("-r", "--snr", help = TEXT, default=-1, type=float)
 
-args = parser.parse_args()
 
 
-def batching(size, b_size):
+def batching(size, b_size,rng):
     """
     Defines batching of data indices for processing.
 
@@ -129,17 +128,17 @@ def batching(size, b_size):
     size_half = int(np.floor(b_size/2))
     batch_dist = np.array(
         [np.concatenate(
-            (random.sample(range(0, x), size_half),
+            (x*rng.random_sample((size_half,)).astype(int),
              np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
     batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
     if size % (size_half*2) != 0:
         max_n_arg = int(np.argwhere(batch_dist[-1] == size))
         batch_dist[-1] = np.concatenate(
-            (batch_dist[-1, :max_n_arg], random.sample(range(0, b_size),
-                                                       size_half*2 - max_n_arg)))
+            (batch_dist[-1, :max_n_arg], b_size*rng.random_sample(
+                                                       (size_half*2 - max_n_arg,)).astype(int)))
     return batch_dist
 
-def main(arguments):
+def main(arguments, seed = None):
     """ 
     Main function to run the CLIC clustering pipeline.
     Args:
@@ -147,12 +146,14 @@ def main(arguments):
     """
     start = time.time()
 
+    rng = np.random.RandomState(seed)
+
     exp_id = random_string(6)
     exp_dir = f"exp_{exp_id}"
     os.makedirs(exp_dir, exist_ok = True)
     store_config(arguments,exp_id)
-    part_locs, n = get_part_locs(arguments)
-    batches = batching(n, arguments.batch_size)
+    part_locs, n = get_part_locs(arguments, rng)
+    batches = batching(n, arguments.batch_size, rng)
 
     with open(f"{exp_dir}/particle_ids.txt", "w") as fl:
         for line in part_locs:
@@ -177,10 +178,10 @@ def main(arguments):
 
         arguments.num = num  # Update with lowest num
 
-        if args.num_comps is not None:
+        if arguments.num_comps is not None:
             lines_reddim, mod_fit, model = fitmodel(all_sinos, arguments.model, arguments.num_comps)
 
-            if args.save_model:
+            if arguments.save_model:
                 np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
                 np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
@@ -201,4 +202,7 @@ def main(arguments):
 
 
 if __name__ == '__main__':
+
+    args = parser.parse_args()
+
     main(args)
