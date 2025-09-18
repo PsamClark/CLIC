@@ -138,15 +138,16 @@ def batching(size, b_size,rng):
                                                        (size_half*2 - max_n_arg,)).astype(int)))
     return batch_dist
 
-def main(arguments, seed = None):
+def run(arguments, rng = None):
     """ 
     Main function to run the CLIC clustering pipeline.
     Args:
         arguments: Parsed command-line arguments.
     """
     start = time.time()
-
-    rng = np.random.RandomState(seed)
+     
+    if rng is None:
+        rng = np.random.RandomState()
 
     exp_id = random_string(6)
     exp_dir = f"exp_{exp_id}"
@@ -155,8 +156,16 @@ def main(arguments, seed = None):
     part_locs, n = get_part_locs(arguments, rng)
     batches = batching(n, arguments.batch_size, rng)
 
+    if arguments.data_set.endswith((".txt",".mrcs")):
+        part_ids = part_locs[1] 
+    
+    else: 
+        part_ids = part_locs
+
     with open(f"{exp_dir}/particle_ids.txt", "w") as fl:
-        for line in part_locs:
+
+        for line in part_ids:
+                
             fl.write(f"{line}\n")
 
     all_name_ids = []
@@ -201,8 +210,9 @@ def main(arguments, seed = None):
     print(f"### Total time: {time.time() - start:.2f}s ###")
 
 
-if __name__ == '__main__':
+
+def main():
 
     args = parser.parse_args()
 
-    main(args)
+    run(args)

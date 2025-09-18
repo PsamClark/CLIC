@@ -114,7 +114,6 @@ def collate_scores() -> None:
     for exp_conf in experiments:
         
         exp_id = Path(exp_conf).stem
-        print(exp_id)
         with open(exp_conf, "r") as conffile:
             config = json.load(conffile)
 
@@ -154,7 +153,6 @@ def get_dict_entries(confdict: Dict[str, Any]) -> Tuple[List[str], List[Any]]:
         else:
             keys.append(k)
             values.append(v)
-
     return keys, values
 
 
@@ -182,6 +180,3 @@ def pop_features(config: Dict[str, Any], score: float,
 
     return features, out_list
 
-
-if __name__ == "__main__":
-    collate_scores()

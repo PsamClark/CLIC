@@ -1,0 +1,3 @@
+[console_scripts]
+clic-log = log:collate_scores
+clic-run = main:main

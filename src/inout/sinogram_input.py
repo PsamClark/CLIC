@@ -224,7 +224,6 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
 
             mdata = mfile.data[rng.randint(len(mfile.data),size = nsub)]
         ids = [file]*nsub
-        print(ids)
         if f == 0: 
             mdata_out = mdata
             ids_out = ids

@@ -83,6 +83,8 @@ def optimize_clustering(clic_exp: str) -> pd.DataFrame:
         ids = [line.split('/')[-1][:4] for line in f.readlines()]
     ids = ids[:len(all_classes)]
 
+
+
     fmt_classes = pd.DataFrame({"id": ids, "class": all_classes})
     class_counts = fmt_classes.groupby(["id", "class"])["class"].agg("count")
     cc_df = class_counts.to_frame(name="count").reset_index()
