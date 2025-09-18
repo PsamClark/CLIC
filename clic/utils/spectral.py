@@ -137,9 +137,8 @@ def bandpass_image(image: np.ndarray,
     hpass = 0 if high is None else spec.shape[0] * pixel_size / high
 
     bp_spec, mask = bpfilter(spec, lpass, hpass, width, order, method)
-    filt_im = np.abs(np.fft.ifftn(np.fft.ifftshift(bp_spec)))
+    filt_im = np.fft.ifftn(np.fft.ifftshift(bp_spec)).real
     filt_im = (filt_im - np.min(filt_im)) / np.ptp(filt_im) * 255
-    filt_im = np.abs(filt_im - 255).astype(np.uint8)
 
     return filt_im, mask
 

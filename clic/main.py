@@ -35,6 +35,7 @@ import time
 
 import numpy as np
 import joblib
+import click
 
 from inout.sinogram_input import sinogram_main
 from inout.sinogram_input import get_part_locs
@@ -49,7 +50,8 @@ from utils.min_matrix import make_slice
 if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
-
+@click.command(name="CLIC")
+@click.option("--dataset","-d",type=str,help="path to data")
 parser = argparse.ArgumentParser()
 
 TEXT = ''' Dataset to be considered for clustering. Input path to mrcs

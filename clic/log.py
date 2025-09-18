@@ -30,12 +30,39 @@ import string
 from glob import glob
 from pathlib import Path
 import json
-import pandas as pd
+import panas as pd
 import h5py
-
+from pydantic import BaseModel
 from analysis.metrics import score_clustering
 
+from pydantic import (
+    BaseModel,
+    DirectoryPath,
+    Field,
+    FilePath,
+    PositiveFloat,
+    PositiveInt,
+    ValidationError,
+    Str
+)
 
+class Config(BaseModel):
+
+    dir: FilePath = Field(None,description="data_path")
+    dsize: PositiveInt = Field(1000, description = "dataset size")
+    bsize: PositiveInt = Field(None,"Batch size")
+    dscale: PositiveFloat = Field(1,"downscaling")
+    filter_method: str = Field("butter","bandpass filter method")
+    lowpass: PositiveFloat = Field(5,"lowpass filter value in angstrom")
+    highpass: PositiveFloat = Field(None,"highpass filter value in angstrom ")
+    psize: PositiveFloat = Field(1, "pixel size")
+    snr: PositiveFloat = Field(None, "snr ratio to add noise to the image")
+    model: str = Field("UMAP","Model type")
+    nlines: PositiveInt = Field(120, "number of sinogram lines")
+    dims: PositiveInt = Field(3, "number of dimensins to reduce to")
+    num_clusters: PositiveInt = Field(2,"number of clusters")
+
+    
 def random_string(length: int) -> str:
     """
     Generate a random alphanumeric string of specified length.
@@ -61,10 +88,10 @@ def store_config(args: Any, exp_id: str) -> None:
         None
     """
     Path("Configs").mkdir(exist_ok=True)
-    config: Dict[str, Dict[str, Any]] = {'model': {}, 'data': {}, 'preprocess': {}}
+    config={}
 
-    config['data']['dir'] = args.data_set
-    config['data']['dsize'] = args.num
+    config['dir'] = args.data_set
+    config['dsize'] = args.num
     config['data']['bsize'] = args.batch_size
 
     config['preprocess']['downscale'] = args.down_scale
@@ -81,6 +108,14 @@ def store_config(args: Any, exp_id: str) -> None:
     with open(f"Configs/{exp_id}.json", "w") as confile:
         json.dump(config, confile)
 
+def load_config(fpath):
+
+    try:
+        with open(fpath, "r") as conffile:
+            config = json.load(conffile)
+    except: 
+        raise ImportError("cofig_file not found")
+    
 
 def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> None:
     """
@@ -114,8 +149,8 @@ def collate_scores() -> None:
     for exp_conf in experiments:
         
         exp_id = Path(exp_conf).stem
-        with open(exp_conf, "r") as conffile:
-            config = json.load(conffile)
+
+        config = load_config(exp_conf)
 
         score = score_clustering(exp_id)
         if score is None:
