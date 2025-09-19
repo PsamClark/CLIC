@@ -6,7 +6,7 @@ Main entry point for the CLIC 3D heterogeneity sorting algorithm.
 
 This script orchestrates the pipeline for clustering 3D cryo-EM particle data using sinogram-based
 dimensionality reduction and stepwise clustering. It supports batch processing, configuration via
-command-line arguments, and outputs dendrograms and cluster assignments for each particle.
+command-line config, and outputs dendrograms and cluster assignments for each particle.
 
 Key Components:
     - Argument parsing for configuration.
@@ -16,7 +16,7 @@ Key Components:
     - Output of cluster assignments and results.
 
 Usage:
-    Run this script from the command line with the required arguments:
+    Run this script from the command line with the required config:
         python main.py -i <input_data> [other options]
 
 Example:
@@ -32,85 +32,87 @@ import os
 import sys
 import random
 import time
+from glob import 
 
 import numpy as np
 import joblib
 import click
 
-from inout.sinogram_input import sinogram_main
-from inout.sinogram_input import get_part_locs
-from engine.dim_red import fitmodel
-from engine.clustering import clustering_main
-from log import random_string
-from log import store_config, store_images
-from inout.star_writer import create
-from utils.min_matrix import make_slice
+from .inout.sinogram_input import sinogram_main
+from .sinogram_input import get_part_locs
+from .engine.dim_red import fitmodel
+from .engine.clustering import clustering_main
+from .log import random_string
+from .log import Config, store_config, store_images
+from .inout.star_writer import create
+from .utils.min_matrix import make_slice
+from .utils.customs import WildCardType 
 
 # To silence deprecation warnings
 if not sys.warnoptions:
     import warnings
     warnings.simplefilter("ignore")
+
 @click.command(name="CLIC")
-@click.option("--dataset","-d",type=str,help="path to data")
-parser = argparse.ArgumentParser()
+@click.option("--dataset","-ds",type=WildCardType(exists=True),
+              help="path to data")
 
-TEXT = ''' Dataset to be considered for clustering. Input path to mrcs
-stack, to individual mrc particles, or to particle starfile with "/PATH/TO/PARTS/*.mrc"
-(Notes: 1. Don't forget "",
-        2. if star file: run from relion home dir
-        3. expects *.mrc or path/to/file.mrcs or path/to/file.star only.
-'''
-parser.add_argument("-i", "--data_set", help=TEXT, required=True, type=str)
+@click.option("-n", "--num", help="number of particles", default=1000, type=int)
 
-TEXT = ''' Number of projections to consider total. Defaults to 1000 '''
-parser.add_argument("-n", "--num", help=TEXT, default=1000, type=int)
 
-TEXT = ''' Batchsize - runs overlapping batches of provided size. This
-speeds up process and requires less memory. Recommended batch size is
-750 < b < 2000'''
-parser.add_argument("-b", "--batch_size", help=TEXT, default=-1, type=int)
+@click.option("-b", "--batch_size", help="batch size", default=None, type=int)
 
-TEXT = ''' Downscaling of image prior to making sinograms '''
-parser.add_argument("-d", "--down_scale", help=TEXT, type=int, default = 1)
+@click.option("-d", "--downscale",
+              help="Downscaling of image prior to making sinograms",
+              type=int, default = 1)
 
-TEXT = ''' value of image filter highpass resolution '''
-parser.add_argument("-hp", "--highpass", help = TEXT, type=int)
+@click.option("-hp", "--highpass",
+              help = "value of image filter highpass resolution in angstroms",
+              type=int)
 
-TEXT = ''' value of image filter lowpass resolution '''
-parser.add_argument("-lp", "--lowpass", help = TEXT, default=5, type=int)
+@click.option("-lp", "--lowpass",
+              help = "value of image filter lowpass resolution in angstroms",
+              default=5, type=int)
 
-TEXT = '''apply tightmask before filtering'''
-parser.add_argument("-tm", "--tightmask", help = TEXT, default=False, action='store_true')
+@click.option("-ps", "--pixel_size",
+              help = "pixel size in angstroms",
+              default=1, type=float)
 
-TEXT = ''' image filter method '''
-parser.add_argument("-fm", "--filter_method", help = TEXT, default="butter", type=str)
+@click.option("-tm", "--tightmask",
+              help = "apply tightmask before filtering",
+              is_flag=True)
 
-TEXT = ''' Number of components of dimensional reduction technique. This
-requires some experimentation '''
-parser.add_argument("-c", "--num_comps", help = TEXT, default=None, type=int)
+@click.option("-fm", "--filter_method",
+              help = "image filter method",
+              default="butter", type=str)
 
-TEXT = ''' Dimensional reduction technique.
-options are: PCA, UMAP, TSNE, LLE, ISOMAP, MDS, TRIMAP.
-Recommended: UMAP and PCA. '''
-parser.add_argument("-m", "--model", help = TEXT, default='UMAP', type=str)
+@click.option("-c", "--comps",
+              help = "number of components in dimensional reduction",
+              default=None, type=int)
 
-TEXT = ''' Save Model'''
-parser.add_argument("-s", "--save_model", help = TEXT, default=False, action='store_true')
+@click.options("-m", "--model",
+               help = "Dimension reduction technique",
+               default='UMAP', type=str)
 
-TEXT = ''' Number of lines in one sinogram (shouldn't need to change
-recommended=120)'''
-parser.add_argument("-l", "--nlines", help = TEXT, default=120, type=int)
+@click.option("-s", "--save_model",
+              help = "Save model",
+              is_flag=True)
 
-TEXT = ''' Run on gpu with CUDA '''
-parser.add_argument("-g", "--gpu", help = TEXT, default=False, action='store_true')
 
-TEXT = ''' Number of clusters '''
-parser.add_argument("-k", "--num_clusters", help = TEXT, default=2, type=int)
+@click.option("-l", "--lines",
+              help = "Number of sinogram lines",
+              default=120, type=int)
 
-TEXT = ''' For testing: Signal to noise ratio to be applied to projection
-before making sinograms '''
-parser.add_argument("-r", "--snr", help = TEXT, default=-1, type=float)
+@click.option("-g", "--gpu",
+              help = "Run on GPU",
+              is_flag=True)
 
+@click.option("-k", "--clusters", help = "Number of clusters", default=2, type=int)
+
+
+@click.option("-r", "--snr",
+              help = "Signal to noise ratio to be applied to projection",
+              default=None, type=float)
 
 
 def batching(size, b_size,rng):
@@ -140,26 +142,44 @@ def batching(size, b_size,rng):
                                                        (size_half*2 - max_n_arg,)).astype(int)))
     return batch_dist
 
-def run(arguments, rng = None):
+def run(dataset,
+        num,
+        batch_size,
+        downscale,
+        highpass,
+        lowpass,
+        tightmask,
+        pixel_size,
+        filter_method,
+        comp,
+        model,
+        save_model,
+        lines,
+        gpu,
+        cluster,
+        snr, 
+        rng = None):
     """ 
     Main function to run the CLIC clustering pipeline.
     Args:
-        arguments: Parsed command-line arguments.
+        config: Parsed command-line config.
     """
     start = time.time()
      
     if rng is None:
         rng = np.random.RandomState()
 
+    config = Config(**locals().copy())
+
     exp_id = random_string(6)
     exp_dir = f"exp_{exp_id}"
     os.makedirs(exp_dir, exist_ok = True)
-    store_config(arguments,exp_id)
-    part_locs, n = get_part_locs(arguments, rng)
-    batches = batching(n, arguments.batch_size, rng)
+    store_config(config,exp_id)
+    part_locs, n = get_part_locs(config, rng)
+    batches = batching(n, config.batch_size, rng)
 
-    if arguments.data_set.endswith((".txt",".mrcs")):
-        part_ids = part_locs[1] 
+    if config.dataset.endswith((".txt",".mrcs")):
+        part_ids = part_locs[1]
     
     else: 
         part_ids = part_locs
@@ -172,14 +192,14 @@ def run(arguments, rng = None):
 
     all_name_ids = []
     b = 0
-    matrix = np.zeros((len(batches), n, arguments.num_clusters))
+    matrix = np.zeros((len(batches), n, config.clusters))
     for batch in batches:
         start_batch = time.time()
         batch_dir = f'{exp_dir}/batch_{b}'
         os.makedirs(batch_dir, exist_ok = True)
         print(f"### Running batch {b+1} of {len(batches)} with size {len(batch)} particles ###")
 
-        all_sinos, all_ims, num, name_ids = sinogram_main(arguments, part_locs, batch)
+        all_sinos, all_ims, num, name_ids = sinogram_main(config, part_locs, batch)
         if b == 0:
             store_images(all_ims, all_sinos, name_ids, exp_dir)
         for name_id in name_ids:
@@ -187,12 +207,12 @@ def run(arguments, rng = None):
                 all_name_ids.append(name_id)
         create(name_ids, batch_dir)
 
-        arguments.num = num  # Update with lowest num
+        config.num = num  # Update with lowest num
 
-        if arguments.num_comps is not None:
-            lines_reddim, mod_fit, model = fitmodel(all_sinos, arguments.model, arguments.num_comps)
+        if config.comps is not None:
+            lines_reddim, mod_fit, model = fitmodel(all_sinos, config.model, config.comps)
 
-            if arguments.save_model:
+            if config.save_model:
                 np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
                 np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
@@ -200,10 +220,10 @@ def run(arguments, rng = None):
 
         else:
             lines_reddim = all_sinos
-            arguments.num_comps = all_sinos.shape[-1]
+            config.comps = all_sinos.shape[-1]
         
 
-        batch_classes = clustering_main(lines_reddim, arguments, batch_dir, name_ids)
+        batch_classes = clustering_main(lines_reddim, config, batch_dir, name_ids)
         matrix[b] = make_slice(batch_classes, batch, matrix.shape)
         print(f"   Batch time: {time.time() - start_batch:.2f}s")
         b += 1
@@ -215,6 +235,4 @@ def run(arguments, rng = None):
 
 def main():
 
-    args = parser.parse_args()
-
-    run(args)
+    run()

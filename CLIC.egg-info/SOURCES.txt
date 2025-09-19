@@ -1,0 +1,12 @@
+README.txt
+pyproject.toml
+CLIC.egg-info/PKG-INFO
+CLIC.egg-info/SOURCES.txt
+CLIC.egg-info/dependency_links.txt
+CLIC.egg-info/entry_points.txt
+CLIC.egg-info/requires.txt
+CLIC.egg-info/top_level.txt
+clic/__init__.py
+clic/log.py
+clic/main.py
+test/test_log.py

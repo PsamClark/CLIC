@@ -30,10 +30,9 @@ import string
 from glob import glob
 from pathlib import Path
 import json
-import panas as pd
+import pandas as pd
 import h5py
-from pydantic import BaseModel
-from analysis.metrics import score_clustering
+from .analysis.metrics import score_clustering
 
 from pydantic import (
     BaseModel,
@@ -42,27 +41,30 @@ from pydantic import (
     FilePath,
     PositiveFloat,
     PositiveInt,
-    ValidationError,
-    Str
+    ValidationError
 )
 
 class Config(BaseModel):
 
-    dir: FilePath = Field(None,description="data_path")
-    dsize: PositiveInt = Field(1000, description = "dataset size")
-    bsize: PositiveInt = Field(None,"Batch size")
-    dscale: PositiveFloat = Field(1,"downscaling")
-    filter_method: str = Field("butter","bandpass filter method")
-    lowpass: PositiveFloat = Field(5,"lowpass filter value in angstrom")
-    highpass: PositiveFloat = Field(None,"highpass filter value in angstrom ")
-    psize: PositiveFloat = Field(1, "pixel size")
-    snr: PositiveFloat = Field(None, "snr ratio to add noise to the image")
-    model: str = Field("UMAP","Model type")
-    nlines: PositiveInt = Field(120, "number of sinogram lines")
-    dims: PositiveInt = Field(3, "number of dimensins to reduce to")
-    num_clusters: PositiveInt = Field(2,"number of clusters")
+    dataset: FilePath = Field('',description="data_path")
+    num: PositiveInt = Field(1000, description = "dataset size")
+    batch_size: PositiveInt = Field(None,description="Batch size")
+    downscale: PositiveFloat = Field(1,description="downscaling")
+    tightmask: bool = Field(False, description= "apply tightmask")
+    filter_method: str = Field("butter",description="bandpass filter method")
+    lowpass: PositiveFloat = Field(5,description="lowpass filter value in angstrom")
+    highpass: PositiveFloat = Field(None,description="highpass filter value in angstrom ")
+    pixel_size: PositiveFloat = Field(1, description= "pixel size")
+    snr: PositiveFloat = Field(None, description="snr ratio to add noise to the image")
+    model: str = Field("UMAP",description="Model type")
 
-    
+    lines: PositiveInt = Field(120,description="number of sinogram lines")
+    comps: PositiveInt = Field(3, description="number of dimensins to reduce to")
+    clusters: PositiveInt = Field(2,description="number of clusters")
+    gpu: bool = Field(False, description="use GPUs")
+    save_model: bool = Field(False, description="save model")
+
+
 def random_string(length: int) -> str:
     """
     Generate a random alphanumeric string of specified length.
@@ -76,7 +78,7 @@ def random_string(length: int) -> str:
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
 
 
-def store_config(args: Any, exp_id: str) -> None:
+def store_config(config: Any, exp_id: str) -> None:
     """
     Store experiment configuration to a JSON file.
 
@@ -87,34 +89,26 @@ def store_config(args: Any, exp_id: str) -> None:
     Returns:
         None
     """
+    
     Path("Configs").mkdir(exist_ok=True)
-    config={}
 
-    config['dir'] = args.data_set
-    config['dsize'] = args.num
-    config['data']['bsize'] = args.batch_size
+    with open(f"Configs/{exp_id}.json","w") as confile:
+        json.dump(config.model_dump(), confile)
 
-    config['preprocess']['downscale'] = args.down_scale
-    config['preprocess']['filter_method'] = args.filter_method
-    config['preprocess']['lowpass'] = args.lowpass
-    config['preprocess']['highpass'] = args.highpass
-    config['preprocess']['snr'] = args.snr
-
-    config['model']['model'] = args.model
-    config['model']['nlines'] = args.nlines
-    config['model']['dims'] = args.num_comps
-    config['model']['clusters'] = args.num_clusters
-
-    with open(f"Configs/{exp_id}.json", "w") as confile:
-        json.dump(config, confile)
 
 def load_config(fpath):
 
     try:
         with open(fpath, "r") as conffile:
-            config = json.load(conffile)
-    except: 
-        raise ImportError("cofig_file not found")
+            config = Config(**json.load(conffile))
+
+        if  config.dataset is None:
+            raise ValueError("dataset path not provided!")
+
+        return config
+    
+    except ValidationError as e:
+        raise ImportError(f"config_file is invalid: {e}")
     
 
 def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> None:
@@ -131,9 +125,9 @@ def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> Non
         None
     """
     with h5py.File(f"{exp_id}/batch0_images.hdf5", "w") as imfile:
-        imfile.create_dataset('batch0/images', data=all_ims)
-        imfile.create_dataset('batch0/sinograms', data=all_sinos)
-        imfile.create_dataset('batch0/ids', data=all_ids)
+        imfile.create_dataset('images', data=all_ims)
+        imfile.create_dataset('sinograms', data=all_sinos)
+        imfile.create_dataset('ids', data=all_ids)
 
 
 def collate_scores() -> None:
@@ -165,32 +159,6 @@ def collate_scores() -> None:
     out_df.to_csv(f"{cwd.name}_cs.csv", index=False)
 
 
-def get_dict_entries(confdict: Dict[str, Any]) -> Tuple[List[str], List[Any]]:
-    """
-    Recursively flatten a nested dictionary into key-value pairs.
-
-    Args:
-        confdict: Nested configuration dictionary.
-
-    Returns:
-        A tuple containing:
-            - keys: Flattened keys with underscores.
-            - values: Corresponding values.
-    """
-    keys: List[str] = []
-    values: List[Any] = []
-
-    for k, v in confdict.items():
-        if isinstance(v, dict):
-            keys_new, values_new = get_dict_entries(v)
-            keys.extend([f"{k}_{i}" for i in keys_new])
-            values.extend(values_new)
-        else:
-            keys.append(k)
-            values.append(v)
-    return keys, values
-
-
 def pop_features(config: Dict[str, Any], score: float,
                  out_list: List[List[Any]], exp_id: str
                  ) -> Tuple[List[str], List[List[Any]]]:
@@ -208,7 +176,7 @@ def pop_features(config: Dict[str, Any], score: float,
             - features: List of feature names.
             - out_list: Updated list of experiment results.
     """
-    features, values = get_dict_entries(config)
+    features, values = config.items()
     values.append(score)
     values.insert(0, exp_id)
     out_list.append(values)

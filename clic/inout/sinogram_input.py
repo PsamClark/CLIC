@@ -35,7 +35,7 @@ import mrcfile
 import gemmi
 import cv2
 
-from utils.spectral import bandpass_image, tight_mask
+from ..utils.spectral import bandpass_image, tight_mask
 
 
 def load_mrc(path: str) -> np.ndarray:
@@ -175,7 +175,7 @@ def gblur(im: np.ndarray) -> np.ndarray:
     return cv2.GaussianBlur(im, (5, 5), 0)
 
 
-def pre_process(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, np.ndarray]:
+def preprocess(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     Apply full preprocessing pipeline to image.
 
@@ -187,7 +187,7 @@ def pre_process(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, 
     Returns:
         Tuple of (sinogram, preprocessed image).
     """
-    if config.snr != -1:
+    if config.snr is not None:
         im = add_noise(im, config.snr)
     if config.tightmask:
         mask = tight_mask(im)
@@ -200,7 +200,7 @@ def pre_process(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, 
     im = downscale(im, ds_size)
     im = stand_image(im)
     im = circular_mask(im)
-    sino = make_sinogram(im, config.nlines)
+    sino = make_sinogram(im, config.lines)
     return sino, im
 
 def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
@@ -248,7 +248,7 @@ def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
     Returns:
         Tuple of (particle locations, number to use).
     """
-    dset_path = config.data_set
+    dset_path = config.dataset
 
     if dset_path.endswith('.txt'):
 
@@ -350,11 +350,11 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int]
         im, name_ids = open_part(x_sb, part_locs, name_ids, config.data_set)
 
         if x == 0:
-            ds_size = im.shape[0] // config.down_scale
-            all_sinos = np.zeros((subsize, config.nlines, ds_size))
+            ds_size = im.shape[0] // config.downscale
+            all_sinos = np.zeros((subsize, config.lines, ds_size))
             all_ims = np.zeros((subsize, ds_size, ds_size))
 
-        sino,imout = pre_process(im, config, ds_size)
+        sino,imout = preprocess(im, config, ds_size)
         all_sinos[x] = sino
         all_ims[x] = imout
 

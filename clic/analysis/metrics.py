@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from utils.min_matrix import align_batches, make_line
+from ..utils.min_matrix import align_batches, make_line
 
 
 def cluster_accuracy(cc_piv: pd.DataFrame) -> float:

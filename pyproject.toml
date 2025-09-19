@@ -49,4 +49,8 @@ Changelog = "https://github.com/PsamClark/CLIC/master/CHANGELOG.md"
 clic-run = "main:main"
 clic-log = "log:collate_scores"
 
+[tool.setuptools]
+
+packages = ["clic"]
+
 

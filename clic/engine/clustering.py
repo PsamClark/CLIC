@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import  fcluster
 from numba import cuda
 
-from inout.star_writer import end_write, update_data
+from .inout.star_writer import end_write, update_data
 
 
 def initial_dict(lines, num):
@@ -468,7 +468,7 @@ def clustering_main(lines, config, clic_dir, ids):
     if config.gpu:
         sinos = np.reshape(
             np.ascontiguousarray(lines),
-            (config.num, config.nlines, config.num_comps))
+            (config.num, config.lines, config.comps))
         scoretable = np.zeros((config.num, config.num), dtype=np.float32)
         disttable = np.array([])
         
@@ -535,7 +535,7 @@ def clustering_main(lines, config, clic_dir, ids):
         current_cl = -1
         t = 1
         runs = 0
-        num_clusters = config.num_clusters
+        num_clusters = config.clusters
         while current_cl != num_clusters:
             if runs > 100:
                 print("Cannot exclude anomalies, Look at clustering of dendrogram")
@@ -566,7 +566,7 @@ def score_bins(gt, exp, config):
     Returns:
         tuple: (max score fraction, fraction of unassigned)
     """
-    num_clusters = config.num_clusters
+    num_clusters = config.clusters
     perm = permutations(range(num_clusters))
     assert(len(gt) == len(exp))
     scores = []

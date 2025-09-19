@@ -1,0 +1,17 @@
+{
+  "dataset": "particle_list.txt",
+  "num": 1000,
+  "batch_size": null,
+  "downscale": 1,
+  "filter_method": "butter",
+  "lowpass": 19,
+  "highpass": null,
+  "pixel_size": 1,
+  "snr": null,
+  "model": "UMAP",
+  "lines": "120",
+  "comps": 10,
+  "clusters": 3,
+  "gpu": true,
+  "save_model": false
+}
