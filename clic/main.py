@@ -39,7 +39,7 @@ import joblib
 import click
 
 from .inout.sinogram_input import sinogram_main
-from .sinogram_input import get_part_locs
+from .inout.sinogram_input import get_part_locs
 from .engine.dim_red import fitmodel
 from .engine.clustering import clustering_main
 from .log import random_string
