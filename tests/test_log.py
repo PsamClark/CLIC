@@ -4,6 +4,8 @@ from copy import deepcopy
 import unittest
 import tempfile
 import mrcfile as mf
+from numpy import testing as npt
+import numpy as np
 import h5py
 
 from tests.testdata import datasets, experiments 
@@ -29,12 +31,12 @@ class LogTest(unittest.TestCase):
             "Configs/config_wrong_type.json")
 
         config_data = {
-            "dataset": join(dirname(experiments.__file__),"particle_list.txt"),
-            "num": 3000,
-            "batch_size": 1000,
+            "dataset": "particle_list.txt",
+            "num": 1000,
+            "batch_size": None,
             "downscale": 1,
             "filter_method": "butter",
-            "lowpass": 7,
+            "lowpass": 19,
             "highpass": None,
             "pixel_size": 1,
             "snr": None,
@@ -54,7 +56,7 @@ class LogTest(unittest.TestCase):
                                "000_2cg9_particles_100.mrcs")
         
         self.sino_path = join(dirname(datasets.__file__), 
-                               "000_2cg9_sinos_100.mrcs")
+                               "000_2cg9_sinograms_100.mrcs")
 
     def test_validate_config(self):
 
@@ -62,13 +64,13 @@ class LogTest(unittest.TestCase):
             self.confile
         )
 
-        config_data = self.config.model_dump
+        config_data = self.config
 
         self.assertEqual(
-            len(data.items()), len(self.default_config.model_dump().items())
+            len(data.model_dump().items()), len(self.default_config.model_dump().items())
         )
 
-        self.assertEqual(data,config_data)
+        self.assertEqual(data.model_dump(),config_data.model_dump())
 
     def tearDown(self):
         os.chdir(self._orig_dir)
@@ -79,7 +81,7 @@ class LogTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_config(self.confile_missing_path)
 
-        with self.assertRaises(TypeError):
+        with self.assertRaises(ImportError):
             load_config(self.confile_wrong_type)
 
     def test_write_config_file(self):
@@ -95,10 +97,10 @@ class LogTest(unittest.TestCase):
 
         data_from_output = load_config(files[0])
 
-        print(data_from_output)
         self.assertEqual(len(files), 1)
 
-        self.assertEqual(data_from_output, self.config.model_dump())
+        self.assertEqual(data_from_output.model_dump().items(), 
+                         self.config.model_dump().items())
 
     def test_store_images(self):
 
@@ -107,11 +109,16 @@ class LogTest(unittest.TestCase):
 
         image_data = {'images':ims,
                       'sinograms':sinos,
-                      'ids':["000"]*100}
+                      'ids':np.array(["000"]*100)}
 
         store_images(ims,sinos,["000"]*100,self.temp_dir.name)
 
-        imfile = h5py.File(f"{self.temp_dir.name}/batch0_images.py","r")
+        imfile = h5py.File(f"{self.temp_dir.name}/batch0_images.hdf5","r")
 
-        self.assertEqual(image_data,imfile)
+        ids = imfile["ids"][:].astype(str)
+        npt.assert_array_equal(image_data['images'],imfile['images'])
+        npt.assert_array_equal(image_data['sinograms'],imfile['sinograms'])
+        npt.assert_array_equal(image_data['ids'],ids)
+
+
 

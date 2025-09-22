@@ -47,7 +47,7 @@ class Config(BaseModel):
 
     dataset: str = Field('',description="data_path")
     num: PositiveInt = Field(1000, description = "dataset size")
-    batch_size: PositiveInt = Field(None,description="Batch size")
+    batch_size: Optional[int] = Field(None,description="Batch size")
     downscale: PositiveFloat = Field(1,description="downscaling")
     tightmask: bool = Field(False, description= "apply tightmask")
     filter_method: str = Field("butter",description="bandpass filter method")
@@ -101,7 +101,7 @@ def load_config(fpath):
         with open(fpath, "r") as conffile:
             config = Config(**json.load(conffile))
 
-        if  config.dataset is None:
+        if  len(config.dataset) ==0:
             raise ValueError("dataset path not provided!")
 
         return config
