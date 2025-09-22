@@ -6,7 +6,9 @@ import tempfile
 import mrcfile as mf
 import h5py
 
-from tests import testdata as td
+from tests.testdata.experiments import Configs
+from tests.testdata import datasets
+
 from clic.log import *
 
 
@@ -18,13 +20,13 @@ class LogTest(unittest.TestCase):
         self._orig_dir = os.getcwd()
         self.temp_dir = tempfile.TemporaryDirectory()
 
-        self.confile = join(dirname(td.experiments.Configs.__file__), "46lLtH.json")
+        self.confile = join(dirname(Configs.__file__), "46lLtH.json")
 
         self.confile_missing_path = join(
-            dirname(td.experiments.Configs.__file__),
+            dirname(Configs.__file__),
             "config_missing_dpath.json")
         self.confile_wrong_type = join(
-            dirname(td.experiments.Configs.__file__),
+            dirname(Configs.__file__),
             "config_wrong_type.json")
 
         config_data = {
@@ -49,10 +51,10 @@ class LogTest(unittest.TestCase):
 
         self.default_config = Config()
 
-        self.image_path = join(dirname(td.datasets.__file__), 
+        self.image_path = join(dirname(datasets.__file__), 
                                "000_2cg9_particles_100.mrcs")
         
-        self.sino_path = join(dirname(td.datasets.__file__), 
+        self.sino_path = join(dirname(datasets.__file__), 
                                "000_2cg9_sinos_100.mrcs")
 
     def test_validate_config(self):
