@@ -22,7 +22,9 @@ dependencies = [
   "trimap",
   "umap-learn",
   "joblib",
-  "numba"
+  "numba",
+  "pydantic",
+  "click",
 ]
 requires-python = ">=3.10"
 authors = [
