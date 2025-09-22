@@ -37,7 +37,7 @@ class LogTest(unittest.TestCase):
             "lowpass": 7,
             "highpass": None,
             "pixel_size": 1,
-            "snr": ,
+            "snr": None,
             "model": "UMAP",
             "lines": 120,
             "comps": 10,
