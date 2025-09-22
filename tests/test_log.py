@@ -95,6 +95,7 @@ class LogTest(unittest.TestCase):
 
         data_from_output = load_config(files[0])
 
+        print(data_from_output)
         self.assertEqual(len(files), 1)
 
         self.assertEqual(data_from_output, self.config.model_dump())
