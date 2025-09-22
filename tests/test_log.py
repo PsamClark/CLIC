@@ -6,8 +6,7 @@ import tempfile
 import mrcfile as mf
 import h5py
 
-from tests.testdata.experiments import Configs
-from tests.testdata import datasets
+from tests.testdata import datasets, experiments 
 
 from clic.log import *
 
@@ -20,14 +19,14 @@ class LogTest(unittest.TestCase):
         self._orig_dir = os.getcwd()
         self.temp_dir = tempfile.TemporaryDirectory()
 
-        self.confile = join(dirname(Configs.__file__), "46lLtH.json")
+        self.confile = join(dirname(experiments.__file__), "Configs/46lLtH.json")
 
         self.confile_missing_path = join(
-            dirname(Configs.__file__),
-            "config_missing_dpath.json")
+            dirname(experiments.__file__),
+            "Configs/config_missing_dpath.json")
         self.confile_wrong_type = join(
-            dirname(Configs.__file__),
-            "config_wrong_type.json")
+            dirname(experiments.__file__),
+            "Configs/config_wrong_type.json")
 
         config_data = {
             "dataset": "particle_list.txt",
