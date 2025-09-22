@@ -18,5 +18,4 @@ jobs:
         python -m pip install --upgrade pip
     - name: Test with pytest
       run: |
-        python -m pip install -e ".[test]"
-        python -m pytest -s -W ignore
+        pytest -v
