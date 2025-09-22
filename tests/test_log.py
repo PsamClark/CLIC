@@ -65,7 +65,7 @@ class LogTest(unittest.TestCase):
         config_data = self.config.model_dump
 
         self.assertEqual(
-            len(data.items()), len(self.default_mod.model_dump().items())
+            len(data.items()), len(self.default_config.model_dump().items())
         )
 
         self.assertEqual(data,config_data)
@@ -93,7 +93,7 @@ class LogTest(unittest.TestCase):
             f"{self.temp_dir.name}/Configs/*"
         )
 
-        data_from_output = load_config(config_file=files[0])
+        data_from_output = load_config(files[0])
 
         self.assertEqual(len(files), 1)
 
