@@ -89,7 +89,7 @@ class LogTest(unittest.TestCase):
 
         store_config(self.config,"test")
 
-        files = glob.glob(
+        files = glob(
             f"{self.temp_dir.name}/Configs/*"
         )
 
