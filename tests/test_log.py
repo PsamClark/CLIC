@@ -46,7 +46,7 @@ class LogTest(unittest.TestCase):
             "save_model": False
             }
         
-        self.config(**config_data)
+        self.config = Config(**config_data)
 
         self.default_config = Config()
 
