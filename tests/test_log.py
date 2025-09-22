@@ -6,7 +6,6 @@ import tempfile
 import mrcfile as mf
 import h5py
 
-import Configs
 from tests import testdata as td
 from clic.log import *
 
