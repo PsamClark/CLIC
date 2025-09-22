@@ -1,6 +1,7 @@
 numpy
 matplotlib
 pandas
+seaborn
 scipy
 scikit-learn
 scikit-image
@@ -14,3 +15,8 @@ trimap
 umap-learn
 joblib
 numba
+pydantic
+click
+
+[test]
+pytest

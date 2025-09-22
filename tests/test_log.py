@@ -29,7 +29,7 @@ class LogTest(unittest.TestCase):
             "Configs/config_wrong_type.json")
 
         config_data = {
-            "dataset": "particle_list.txt",
+            "dataset": join(dirname(experiments.__file__),"particle_list.txt"),
             "num": 3000,
             "batch_size": 1000,
             "downscale": 1,
@@ -37,7 +37,7 @@ class LogTest(unittest.TestCase):
             "lowpass": 7,
             "highpass": None,
             "pixel_size": 1,
-            "snr": None,
+            "snr": ,
             "model": "UMAP",
             "lines": 120,
             "comps": 10,

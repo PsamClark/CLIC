@@ -9,4 +9,4 @@ CLIC.egg-info/top_level.txt
 clic/__init__.py
 clic/log.py
 clic/main.py
-test/test_log.py
+tests/test_log.py

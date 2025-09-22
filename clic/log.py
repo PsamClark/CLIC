@@ -24,7 +24,7 @@ Dependencies:
     - h5py
     - metrics.score_clustering
 """
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 import random
 import string
 from glob import glob
@@ -36,7 +36,6 @@ from .analysis.metrics import score_clustering
 
 from pydantic import (
     BaseModel,
-    DirectoryPath,
     Field,
     FilePath,
     PositiveFloat,
@@ -46,16 +45,16 @@ from pydantic import (
 
 class Config(BaseModel):
 
-    dataset: FilePath = Field('',description="data_path")
+    dataset: str = Field('',description="data_path")
     num: PositiveInt = Field(1000, description = "dataset size")
     batch_size: PositiveInt = Field(None,description="Batch size")
     downscale: PositiveFloat = Field(1,description="downscaling")
     tightmask: bool = Field(False, description= "apply tightmask")
     filter_method: str = Field("butter",description="bandpass filter method")
     lowpass: PositiveFloat = Field(5,description="lowpass filter value in angstrom")
-    highpass: PositiveFloat = Field(None,description="highpass filter value in angstrom ")
+    highpass: Optional[int] = Field(None,description="highpass filter value in angstrom ")
     pixel_size: PositiveFloat = Field(1, description= "pixel size")
-    snr: PositiveFloat = Field(None, description="snr ratio to add noise to the image")
+    snr: Optional[float] = Field(None, description="snr ratio to add noise to the image")
     model: str = Field("UMAP",description="Model type")
 
     lines: PositiveInt = Field(120,description="number of sinogram lines")

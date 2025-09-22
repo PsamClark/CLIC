@@ -13,6 +13,7 @@ Requires-Python: >=3.10
 Requires-Dist: numpy
 Requires-Dist: matplotlib
 Requires-Dist: pandas
+Requires-Dist: seaborn
 Requires-Dist: scipy
 Requires-Dist: scikit-learn
 Requires-Dist: scikit-image
@@ -26,3 +27,7 @@ Requires-Dist: trimap
 Requires-Dist: umap-learn
 Requires-Dist: joblib
 Requires-Dist: numba
+Requires-Dist: pydantic
+Requires-Dist: click
+Provides-Extra: test
+Requires-Dist: pytest; extra == "test"
