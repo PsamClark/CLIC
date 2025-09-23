@@ -51,7 +51,7 @@ class SinogramInputTest(unittest.TestCase):
 
     def test_preprocess(self):
 
-        sinogram,_ = preprocess(self.orig_image, config=self.config, self.orig_image.shape[0])
+        sinogram,_ = preprocess(self.orig_image, self.config, self.orig_image.shape[0])
 
         npt.assert_array_equal(self.sino, sinogram)
 
