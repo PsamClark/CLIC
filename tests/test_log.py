@@ -83,7 +83,6 @@ class LogTest(unittest.TestCase):
 
         with self.assertRaises(ImportError):
             load_config(self.confile_wrong_type)
-
     def test_write_config_file(self):
 
     
@@ -115,7 +114,7 @@ class LogTest(unittest.TestCase):
 
         imfile = h5py.File(f"{self.temp_dir.name}/batch0_images.hdf5","r")
 
-        ids = imfile["ids"][:].astype(str)
+        ids = imfile["ids"][:]
         npt.assert_array_equal(image_data['images'],imfile['images'])
         npt.assert_array_equal(image_data['sinograms'],imfile['sinograms'])
         npt.assert_array_equal(image_data['ids'],ids)

@@ -77,21 +77,6 @@ def tight_mask(image: np.ndarray, lpass: int = 8,
     dilated = mph.binary_dilation(bin_image, disc).astype(float)
     return cv2.GaussianBlur(dilated, (gkern_size, gkern_size), 0)
 
-
-def spectrum1d_sinogram(image: np.ndarray) -> np.ndarray:
-    """
-    Compute 1D power spectrum of sinogram.
-
-    Args:
-        image: Sinogram image.
-
-    Returns:
-        1D spectrum.
-    """
-    fourier_image = np.fft.fft(image)
-    return np.sum(np.abs(fourier_image) ** 2, axis=-1)
-
-
 def spectrum2d(image: np.ndarray) -> np.ndarray:
     """
     Compute 2D Fourier spectrum of image.
