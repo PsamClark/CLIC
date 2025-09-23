@@ -21,7 +21,7 @@ class SinogramInputTest(unittest.TestCase):
 
     def setUp(self):
         
-        self.orig_image = mf.read(join(dirname(datasets.__file__), "000_2cg9_particles_100.mrcs"))[1]
+        self.orig_image = mf.read(join(dirname(datasets.__file__), "000_2cg9_particles_100.mrcs"))[0]
 
         self.sino= mf.read(join(dirname(datasets.__file__), 
                                "000_2cg9_sinograms_100.mrcs"))[0]
