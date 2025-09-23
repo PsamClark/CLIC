@@ -114,7 +114,7 @@ class LogTest(unittest.TestCase):
 
         imfile = h5py.File(f"{self.temp_dir.name}/batch0_images.hdf5","r")
 
-        ids = imfile["ids"][:]
+        ids = imfile["ids"][:].astype(str)
         npt.assert_array_equal(image_data['images'],imfile['images'])
         npt.assert_array_equal(image_data['sinograms'],imfile['sinograms'])
         npt.assert_array_equal(image_data['ids'],ids)
