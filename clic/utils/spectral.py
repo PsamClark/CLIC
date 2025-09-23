@@ -75,7 +75,8 @@ def tight_mask(image: np.ndarray, lpass: int = 8,
     bin_image = binar_image(filt_image)
     disc = mph.disk(dilate_radius)
     dilated = mph.binary_dilation(bin_image, disc).astype(float)
-    return cv2.GaussianBlur(dilated, (gkern_size, gkern_size), 0)
+    gauss_tmask = cv2.GaussianBlur(dilated, (gkern_size, gkern_size), 0)
+    return gauss_tmask.astype(np.float32)
 
 def spectrum2d(image: np.ndarray) -> np.ndarray:
     """
@@ -125,7 +126,7 @@ def bandpass_image(image: np.ndarray,
     filt_im = np.fft.ifftn(np.fft.ifftshift(bp_spec)).real
     filt_im = (filt_im - np.min(filt_im)) / np.ptp(filt_im) * 255
 
-    return filt_im, mask
+    return filt_im.astype(np.uint8), mask.astype(np.float32)
 
 
 def bpfilter(image: np.ndarray,

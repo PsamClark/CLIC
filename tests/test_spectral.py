@@ -56,7 +56,7 @@ class SpectralTest(unittest.TestCase):
 
     def test_gauss_filter(self):
 
-        filter_image, filter_mask = bandpass_image(self.orig_image, low = self.lowpass,high = self.highpass
+        filter_image, filter_mask = bandpass_image(self.orig_image, low = self.lowpass, high = self.highpass,
                                                    method = "gauss")
 
 
