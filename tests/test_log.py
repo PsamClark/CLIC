@@ -83,6 +83,7 @@ class LogTest(unittest.TestCase):
 
         with self.assertRaises(ImportError):
             load_config(self.confile_wrong_type)
+            
     def test_write_config_file(self):
 
     
