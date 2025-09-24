@@ -10,3 +10,5 @@ clic/__init__.py
 clic/log.py
 clic/main.py
 tests/test_log.py
+tests/test_sinogram_input.py
+tests/test_spectral.py
