@@ -56,92 +56,46 @@ if not sys.warnoptions:
 @click.command(name="CLIC")
 @click.option("--dataset","-ds",type=WildCardType(exists=True),
               help="path to data")
-
 @click.option("-n", "--num", help="number of particles", default=1000, type=int)
 
-
 @click.option("-b", "--batch_size", help="batch size", default=None, type=int)
-
 @click.option("-d", "--downscale",
               help="Downscaling of image prior to making sinograms",
               type=int, default = 1)
-
 @click.option("-hp", "--highpass",
               help = "value of image filter highpass resolution in angstroms",
               type=int)
-
 @click.option("-lp", "--lowpass",
               help = "value of image filter lowpass resolution in angstroms",
               default=5, type=int)
-
 @click.option("-ps", "--pixel_size",
               help = "pixel size in angstroms",
               default=1, type=float)
-
 @click.option("-tm", "--tightmask",
               help = "apply tightmask before filtering",
               is_flag=True)
-
 @click.option("-fm", "--filter_method",
               help = "image filter method",
               default="butter", type=str)
-
 @click.option("-c", "--comps",
               help = "number of components in dimensional reduction",
               default=None, type=int)
-
-@click.options("-m", "--model",
+@click.option("-m", "--model",
                help = "Dimension reduction technique",
                default='UMAP', type=str)
-
 @click.option("-s", "--save_model",
               help = "Save model",
               is_flag=True)
-
-
 @click.option("-l", "--lines",
               help = "Number of sinogram lines",
               default=120, type=int)
-
 @click.option("-g", "--gpu",
               help = "Run on GPU",
               is_flag=True)
-
 @click.option("-k", "--clusters", help = "Number of clusters", default=2, type=int)
-
-
 @click.option("-r", "--snr",
               help = "Signal to noise ratio to be applied to projection",
               default=None, type=float)
-
-
-def batching(size, b_size,rng):
-    """
-    Defines batching of data indices for processing.
-
-    Args:
-        size (int): Total number of items to batch.
-        b_size (int): Desired batch size.
-
-    Returns:
-        list: List of numpy arrays or ranges, each representing a batch of indices.
-    """
-    all_n = range(size)
-    if b_size >= size or b_size == -1:
-        return [all_n]
-    size_half = int(np.floor(b_size/2))
-    batch_dist = np.array(
-        [np.concatenate(
-            (x*rng.random_sample((size_half,)).astype(int),
-             np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
-    batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
-    if size % (size_half*2) != 0:
-        max_n_arg = int(np.argwhere(batch_dist[-1] == size))
-        batch_dist[-1] = np.concatenate(
-            (batch_dist[-1, :max_n_arg], b_size*rng.random_sample(
-                                                       (size_half*2 - max_n_arg,)).astype(int)))
-    return batch_dist
-
 def run(dataset,
         num,
         batch_size,
@@ -151,12 +105,12 @@ def run(dataset,
         tightmask,
         pixel_size,
         filter_method,
-        comp,
+        comps,
         model,
         save_model,
         lines,
         gpu,
-        cluster,
+        clusters,
         snr, 
         rng = None):
     """ 
@@ -199,7 +153,7 @@ def run(dataset,
         os.makedirs(batch_dir, exist_ok = True)
         print(f"### Running batch {b+1} of {len(batches)} with size {len(batch)} particles ###")
 
-        all_sinos, all_ims, num, name_ids = sinogram_main(config, part_locs, batch)
+        all_sinos, all_ims, num, name_ids = sinogram_main(config, part_locs, batch,rng)
         if b == 0:
             store_images(all_ims, all_sinos, name_ids, exp_dir)
         for name_id in name_ids:
@@ -231,8 +185,34 @@ def run(dataset,
     np.save(f"{exp_dir}/cluster_matrix.npy", matrix)
     print(f"### Total time: {time.time() - start:.2f}s ###")
 
+def batching(size, b_size,rng):
+    """
+    Defines batching of data indices for processing.
 
+    Args:
+        size (int): Total number of items to batch.
+        b_size (int): Desired batch size.
 
-def main():
+    Returns:
+        list: List of numpy arrays or ranges, each representing a batch of indices.
+    """
+    all_n = range(size)
+    if b_size is None:
+        return [all_n]
+    elif b_size >= size:
+        print("batchsize given larger than or equal to sample size.")
+        print("defaulting to no batching.")
+        return [all_n]
 
-    run()
+    size_half = int(np.floor(b_size/2))
+    batch_dist = np.array(
+        [np.concatenate(
+            (x*rng.random_sample((size_half,)).astype(int),
+             np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
+    batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
+    if size % (size_half*2) != 0:
+        max_n_arg = int(np.argwhere(batch_dist[-1] == size))
+        batch_dist[-1] = np.concatenate(
+            (batch_dist[-1, :max_n_arg], b_size*rng.random_sample(
+                                                       (size_half*2 - max_n_arg,)).astype(int)))
+    return batch_dist

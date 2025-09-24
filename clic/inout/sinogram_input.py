@@ -35,7 +35,7 @@ import mrcfile
 import gemmi
 import cv2
 
-from ..utils.spectral import bandpass_image, tight_mask
+from clic.utils.spectral import bandpass_image, tight_mask
 
 
 def load_mrc(path: str) -> np.ndarray:
@@ -66,7 +66,7 @@ def stand_image(image: np.ndarray) -> np.ndarray:
     return (image - np.mean(image)) / np.std(image)
 
 
-def add_noise(image: np.ndarray, snr: float = 1) -> np.ndarray:
+def add_noise(image: np.ndarray, rng, snr: float = 1) -> np.ndarray:
     """
     Add Gaussian noise to image based on signal-to-noise ratio.
 
@@ -175,7 +175,7 @@ def gblur(im: np.ndarray) -> np.ndarray:
     return cv2.GaussianBlur(im, (5, 5), 0)
 
 
-def preprocess(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, np.ndarray]:
+def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarray, np.ndarray]:
     """
     Apply full preprocessing pipeline to image.
 
@@ -188,7 +188,7 @@ def preprocess(im: np.ndarray, config: Any, ds_size: int) -> Tuple[np.ndarray, n
         Tuple of (sinogram, preprocessed image).
     """
     if config.snr is not None:
-        im = add_noise(im, config.snr)
+        im = add_noise(im, rng, config.snr)
     if config.tightmask:
         mask = tight_mask(im)
         im = im*mask
@@ -329,7 +329,7 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
     return im, name_ids
 
 
-def sinogram_main(config: Any, part_locs: Any, subset: List[int]
+def sinogram_main(config: Any, part_locs: Any, subset: List[int], rng
                   ) -> Tuple[np.ndarray, np.ndarray, int, List[str]]:
     """
     Main function to generate sinograms from a subset of particles.
@@ -347,14 +347,14 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int]
     all_sinos = None
     all_ims = None
     for x, x_sb in enumerate(subset):
-        im, name_ids = open_part(x_sb, part_locs, name_ids, config.data_set)
+        im, name_ids = open_part(x_sb, part_locs, name_ids, config.dataset)
 
         if x == 0:
-            ds_size = im.shape[0] // config.downscale
+            ds_size = int(im.shape[0] // config.downscale)
             all_sinos = np.zeros((subsize, config.lines, ds_size))
             all_ims = np.zeros((subsize, ds_size, ds_size))
 
-        sino,imout = preprocess(im, config, ds_size)
+        sino,imout = preprocess(im, config, ds_size, rng)
         all_sinos[x] = sino
         all_ims[x] = imout
 

@@ -27,7 +27,7 @@ Example:
 import argparse
 import gemmi
 
-from utils.cutter import cut
+from clic.utils.cutter import cut
 
 def new_star(class_n, members, relstar, tbl ):
     """

@@ -49,7 +49,7 @@ Repository = "https://github.com/PsamClark/CLIC.git"
 Changelog = "https://github.com/PsamClark/CLIC/master/CHANGELOG.md"
 
 [project.scripts]
-clic-run = "clic.main:main"
+clic-run = "clic.main:run"
 clic-log = "clic.log:collate_scores"
 
 [tool.setuptools]

@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import  fcluster
 from numba import cuda
 
-from .inout.star_writer import end_write, update_data
+from clic.inout.star_writer import end_write, update_data
 
 
 def initial_dict(lines, num):
@@ -531,7 +531,7 @@ def clustering_main(lines, config, clic_dir, ids):
     np.save(f"{clic_dir}/large_merges", np.asarray(large_merges))
 
 
-    if config.num_clusters != -1:
+    if config.clusters != -1:
         current_cl = -1
         t = 1
         runs = 0
