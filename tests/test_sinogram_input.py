@@ -48,10 +48,11 @@ class SinogramInputTest(unittest.TestCase):
             }
 
         self.config = Config(**config_data)
+        self.rng = np.random.RandomState(42)
 
     def test_preprocess(self):
 
-        sinogram,_ = preprocess(self.orig_image, self.config, self.orig_image.shape[0])
+        sinogram,_ = preprocess(self.orig_image, self.config, self.orig_image.shape[0],rng=self.rng)
 
         npt.assert_array_equal(self.sino.shape, sinogram.shape)
         npt.assert_array_almost_equal(self.sino, sinogram.astype(np.float32))
