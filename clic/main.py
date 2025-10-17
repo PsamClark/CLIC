@@ -205,19 +205,16 @@ def batching(size, b_size,rng):
         return [all_n]
 
     size_half = int(np.floor(b_size/2))
-    print(size_half)
     batch_dist = np.array(
         [np.concatenate(
             ((x*rng.random_sample((size_half,))).astype(int),
              np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
     
     batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
-    print(size/(size_half*2))
     if (size-size_half*2) % (size_half) != 0:
         
         max_n_arg = np.argwhere(batch_dist[-1] == size)[0][0].astype(int)
 
-        print(max_n_arg)
         batch_dist[-1] = np.concatenate(
             (batch_dist[-1, :max_n_arg], (b_size*rng.random_sample(
                                                        (size_half*2 - max_n_arg,))).astype(int)))

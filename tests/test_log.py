@@ -113,7 +113,7 @@ class LogTest(unittest.TestCase):
 
         store_images(ims,sinos,["000"]*100,self.temp_dir.name)
 
-        imfile = h5py.File(f"{self.temp_dir.name}/batch0_images.hdf5","r")
+        imfile = h5py.File(f"{self.temp_dir.name}/batch1_images.hdf5","r")
 
         ids = imfile["ids"][:].astype(str)
         npt.assert_array_equal(image_data['images'],imfile['images'])
