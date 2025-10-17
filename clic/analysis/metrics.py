@@ -61,7 +61,7 @@ def cluster_accuracy(cc_piv: pd.DataFrame) -> float:
     return correct
 
 
-def optimize_clustering(clic_exp: str) -> pd.DataFrame:
+def optimize_clustering(clic_exp: str, dir = None) -> pd.DataFrame:
     """
     Align clustering results and format them into a pivot table.
 
@@ -71,15 +71,19 @@ def optimize_clustering(clic_exp: str) -> pd.DataFrame:
     Returns:
         Pivot table of class counts per experiment ID.
     """
+    if dir is not None:
+        mpath = f"{dir}/{clic_exp}"
+    else:
+        mpath = clic_exp
     try:
-        data = np.load(f"{clic_exp}/cluster_matrix.npy")
+        data = np.load(f"{mpath}/cluster_matrix.npy")
     except:
         return None
 
     aligned_matrix = align_batches(data)
     all_classes = make_line(aligned_matrix)
 
-    with open(f"{clic_exp}/particle_ids.txt", "r") as f:
+    with open(f"{mpath}/particle_ids.txt", "r") as f:
         ids = [line.split('/')[-1][:4] for line in f.readlines()]
     ids = ids[:len(all_classes)]
 
@@ -93,7 +97,7 @@ def optimize_clustering(clic_exp: str) -> pd.DataFrame:
     return cc_piv.astype(int)
 
 
-def score_clustering(exp_id: Union[str, int]) -> float:
+def score_clustering(exp_id: Union[str, int], dir = None) -> float:
     """
     Calculate clustering score for a given experiment.
 
@@ -103,10 +107,11 @@ def score_clustering(exp_id: Union[str, int]) -> float:
     Returns:
         Accuracy score as a float.
     """
-    return cluster_accuracy(optimize_clustering(f"exp_{exp_id}"))
+    print("iam here")
+    return cluster_accuracy(optimize_clustering(f"exp_{exp_id}",dir = dir))
 
 
-def plot_clustering(exp_id: Union[str, int]) -> None:
+def plot_clustering(exp_id: Union[str, int], dir = None) -> None:
     """
     Plot clustering heatmap for a given experiment.
 
@@ -117,7 +122,7 @@ def plot_clustering(exp_id: Union[str, int]) -> None:
         None
     """
     sns.heatmap(
-        optimize_clustering(f"exp_{exp_id}"),
+        optimize_clustering(f"exp_{exp_id}",dir = dir),
         annot=True,
         fmt="d",
         cbar=False

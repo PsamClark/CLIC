@@ -123,7 +123,7 @@ def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> Non
     Returns:
         None
     """
-    with h5py.File(f"{exp_id}/batch0_images.hdf5", "w") as imfile:
+    with h5py.File(f"{exp_id}/batch1_images.hdf5", "w") as imfile:
         imfile.create_dataset('images', data=all_ims)
         imfile.create_dataset('sinograms', data=all_sinos)
         imfile.create_dataset('ids', data=all_ids)
@@ -175,7 +175,10 @@ def pop_features(config: Dict[str, Any], score: float,
             - features: List of feature names.
             - out_list: Updated list of experiment results.
     """
-    features, values = config.items()
+
+    conf_dict = config.model_dump()
+    features = list(conf_dict.keys())
+    values = list(conf_dict.values())
     values.append(score)
     values.insert(0, exp_id)
     out_list.append(values)

@@ -221,12 +221,9 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
     for f,file in  enumerate(files):
 
         with mrcfile.open(file,'r') as mfile:
-            choice = rng.choice(len(mfile.data),size = nsub, replace = False)
-            mdata = mfile.data[choice]
-        ids = np.array([file]*nsub, dtype='S')
 
-        ids = np.char.add(ids,choice.astype('S'))
-           
+            mdata = mfile.data[rng.choice(len(mfile.data),size = nsub, replace = False)]
+        ids = [file]*nsub
         if f == 0: 
             mdata_out = mdata
             ids_out = ids
@@ -235,7 +232,8 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
 
             mdata_out = np.concat((mdata_out,mdata))
 
-            ids_out = np.concat((ids_out, ids))
+            ids_out.extend(ids)
+        #print(ids_out)
     
     return (mdata_out,ids_out), nsub*3
 
