@@ -338,9 +338,7 @@ def update_cl(cluster_dict, scoretable, cluster_labels, z, z_corr):
     Returns:
         tuple: Updated (cluster_dict, scoretable, cluster_labels, paired, z, z_corr, score_inv)
     """
-    
     score = np.max(scoretable)
-    print(score)
     a, b = np.where(scoretable == score)
     if len(a) > 1:  # only take one entry
         a = a[0]
