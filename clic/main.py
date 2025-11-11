@@ -211,7 +211,6 @@ def batching(size, b_size,rng):
              np.array(range(x, x+size_half)))) for x in range(size_half*2, size, size_half)])
     
     batch_dist = np.concatenate(([range(0, size_half*2)], batch_dist))
-    print(batch_dist[1])
     if (size-size_half*2) % (size_half) != 0:
         
         max_n_arg = np.argwhere(batch_dist[-1] == size)[0][0].astype(int)

@@ -340,7 +340,6 @@ def update_cl(cluster_dict, scoretable, cluster_labels, z, z_corr):
     """
     
     score = np.max(scoretable)
-    print(score)
     a, b = np.where(scoretable == score)
     if len(a) > 1:  # only take one entry
         a = a[0]
