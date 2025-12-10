@@ -237,7 +237,7 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
 
             ids_out = np.concat((ids_out, ids))
     
-    return (mdata_out,ids_out), nsub*3
+    return (mdata_out,ids_out), nsub*len(files)
 
     
 def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
