@@ -1,0 +1,16 @@
+numpy
+matplotlib
+pandas
+scipy
+scikit-learn
+scikit-image
+torch
+torchvision
+opencv-python
+mrcfile
+gemmi
+h5py
+trimap
+umap-learn
+joblib
+numba
