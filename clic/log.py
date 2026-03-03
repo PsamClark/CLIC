@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Tuple, Optional
 import random
 import string
 from glob import glob
-from pathlib import Path
+from pathlib import Path, PurePath
 import json
 import pandas as pd
 import h5py
@@ -37,7 +37,6 @@ from .analysis.metrics import score_clustering
 from pydantic import (
     BaseModel,
     Field,
-    FilePath,
     PositiveFloat,
     PositiveInt,
     ValidationError
@@ -45,7 +44,7 @@ from pydantic import (
 
 class Config(BaseModel):
 
-    dataset: str = Field('',description="data_path")
+    dataset: PurePath = Field('',description="data_path")
     num: PositiveInt = Field(1000, description = "dataset size")
     batch_size: Optional[int] = Field(None,description="Batch size")
     downscale: PositiveFloat = Field(1,description="downscaling")
@@ -59,7 +58,7 @@ class Config(BaseModel):
 
     lines: PositiveInt = Field(120,description="number of sinogram lines")
     comps: PositiveInt = Field(3, description="number of dimensins to reduce to")
-    clusters: PositiveInt = Field(2,description="number of clusters")
+    clusters: Optional[PositiveInt] = Field(2,description="number of clusters")
     gpu: bool = Field(False, description="use GPUs")
     save_model: bool = Field(False, description="save model")
 
@@ -88,11 +87,17 @@ def store_config(config: Any, exp_id: str) -> None:
     Returns:
         None
     """
+    config_dict = config.model_dump()
+    
+    for key,val in config_dict.items():
+
+        if isinstance(val, PurePath):
+            config_dict[key] = str(val)
     
     Path("Configs").mkdir(exist_ok=True)
 
     with open(f"Configs/{exp_id}.json","w") as confile:
-        json.dump(config.model_dump(), confile)
+        json.dump(config_dict, confile)
 
 
 def load_config(fpath):
@@ -101,7 +106,7 @@ def load_config(fpath):
         with open(fpath, "r") as conffile:
             config = Config(**json.load(conffile))
 
-        if  len(config.dataset) ==0:
+        if  len(str(config.dataset)) ==0:
             raise ValueError("dataset path not provided!")
 
         return config
@@ -147,6 +152,7 @@ def collate_scores() -> None:
 
         score = score_clustering(exp_id)
         if score is None:
+            print("no score")
             continue
         features, out_list = pop_features(config, score, out_list, exp_id)
 

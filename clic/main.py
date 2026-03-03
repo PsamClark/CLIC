@@ -27,12 +27,9 @@ Authors:
 """
 
 # Other dependencies
-import argparse
 import os
 import sys
-import random
 import time
-from glob import glob 
 
 import numpy as np
 import joblib
@@ -92,7 +89,7 @@ if not sys.warnoptions:
 @click.option("-g", "--gpu",
               help = "Run on GPU",
               is_flag=True)
-@click.option("-k", "--clusters", help = "Number of clusters", default=2, type=int)
+@click.option("-k", "--clusters", help = "Number of clusters", type=int)
 @click.option("-r", "--snr",
               help = "Signal to noise ratio to be applied to projection",
               default=None, type=float)
@@ -127,12 +124,13 @@ def run(dataset,
 
     exp_id = random_string(6)
     exp_dir = f"exp_{exp_id}"
+    print(f"Experiment running under id: {exp_id}")
     os.makedirs(exp_dir, exist_ok = True)
     store_config(config,exp_id)
     part_locs, n = get_part_locs(config, rng)
     batches = batching(n, config.batch_size, rng)
 
-    if config.dataset.endswith((".txt",".mrcs")):
+    if config.dataset.suffix in [".txt",".mrcs"]:
         part_ids = part_locs[1]
     
     else: 
@@ -146,7 +144,8 @@ def run(dataset,
 
     all_name_ids = []
     b = 0
-    matrix = np.zeros((len(batches), n, config.clusters))
+    if config.clusters is not None:
+        matrix = np.zeros((len(batches), n, config.clusters))
     for batch in batches:
         start_batch = time.time()
         batch_dir = f'{exp_dir}/batch_{b}'
@@ -176,13 +175,13 @@ def run(dataset,
             lines_reddim = all_sinos
             config.comps = all_sinos.shape[-1]
         
-
-        batch_classes = clustering_main(lines_reddim, config, batch_dir, name_ids)
-        matrix[b] = make_slice(batch_classes, batch, matrix.shape)
+        if config.clusters is not None:
+            batch_classes = clustering_main(lines_reddim, config, batch_dir, name_ids)
+            matrix[b] = make_slice(batch_classes, batch, matrix.shape)
         print(f"   Batch time: {time.time() - start_batch:.2f}s")
         b += 1
-
-    np.save(f"{exp_dir}/cluster_matrix.npy", matrix)
+    if config.clusters is not None:
+        np.save(f"{exp_dir}/cluster_matrix.npy", matrix)
     print(f"### Total time: {time.time() - start:.2f}s ###")
 
 def batching(size, b_size,rng):

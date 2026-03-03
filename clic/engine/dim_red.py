@@ -91,8 +91,13 @@ def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int
         model = TRIMAP(n_iters=1000)
 
     lines = split_sinos(sinos)
-    mod_fit = model.fit(lines)
-    sinos_trans = model.transform(lines)
+    if model_choice == "TSNE":
+        sinos_trans = model.fit_transform(lines)
+        mod_fit = None
+        
+    else:
+        mod_fit = model.fit(lines)
+        sinos_trans = model.transform(lines)
 
     comp_var(sinos_trans)
 

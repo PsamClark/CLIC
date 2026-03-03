@@ -345,6 +345,7 @@ def update_cl(cluster_dict, scoretable, cluster_labels, z, z_corr):
         a = a[0]
         b = b[0]
 
+    print(a)
     paired = (cluster_labels[int(a)], cluster_labels[int(b)])
     p0 = np.min(paired)  # By convention new group name is lowest of two
     p1 = np.max(paired)
@@ -532,7 +533,7 @@ def clustering_main(lines, config, clic_dir, ids):
     np.save(f"{clic_dir}/large_merges", np.asarray(large_merges))
 
 
-    if config.clusters != -1:
+    if config.clusters is not None:
         current_cl = -1
         t = 1
         runs = 0

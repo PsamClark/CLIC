@@ -26,6 +26,7 @@ Dependencies:
 
 import sys
 import random
+from pathlib import PurePath
 from typing import Tuple, List, Any
 from glob import glob
 
@@ -35,7 +36,7 @@ import mrcfile
 import gemmi
 import cv2
 
-from clic.utils.spectral import bandpass_image, tight_mask
+from clic.utils.spectral import bandpass_image, tightmask
 
 
 def load_mrc(path: str) -> np.ndarray:
@@ -48,9 +49,9 @@ def load_mrc(path: str) -> np.ndarray:
     Returns:
         2D image array.
     """
-    with mrcfile.open(path) as f:
+    with mrcfile.mmap(path,'r') as f:
         image = f.data
-    return image[0] if image.ndim == 3 else image
+    return image
 
 
 def stand_image(image: np.ndarray) -> np.ndarray:
@@ -189,14 +190,18 @@ def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarr
     """
     if config.snr is not None:
         im = add_noise(im, rng, config.snr)
-    if config.tightmask:
-        mask = tight_mask(im)
-        im = im*mask
-        del mask
+
     im, _ = bandpass_image(
         im, low=config.lowpass, high=config.highpass,
+        pixel_size=config.pixel_size,
         method=config.filter_method
         )
+    
+    if config.tightmask:
+        mask = tightmask(im)
+        im = im*mask
+        del mask   
+
     im = downscale(im, ds_size)
     im = stand_image(im)
     im = circular_mask(im)
@@ -214,17 +219,43 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
         1 if multiple .mrcs files, else 0.
     """
 
-    files = [i.strip('\n') for  i in open(dset_path, 'r').readlines()]
+    if 'mrc' in dset_path.suffix:
+        print(str(dset_path))
+        files = glob(str(dset_path)) 
+
+    elif 'txt' in dset_path.suffix:
+
+        files = [
+            i.strip('\n') for  i in open(
+                dset_path, 'r').readlines() if 'mrc' in PurePath(i).suffix]
+        
+    if len(files) == 0:
+        print("No mrc files found!")
 
     nsub = ntot // len(files)
 
     for f,file in  enumerate(files):
 
-        with mrcfile.open(file,'r') as mfile:
-            choice = rng.choice(len(mfile.data),size = nsub, replace = False)
-            mdata = mfile.data[choice]
-        ids = np.array([file]*nsub, dtype='S')
+        with mrcfile.mmap(file,'r') as mfile:
+            
+            if mfile.data.ndim==3: 
+                if mfile.data.shape[0] > nsub:
+                    choice = rng.choice(len(mfile.data),
+                                        size = nsub,
+                                        replace = False)
+                    mdata = mfile.data[choice]
+                
 
+                else:
+                    mdata = mfile.data[:]
+                id_len = len(mdata)
+            
+            else:
+                mdata = mfile.data[np.newaxis,:]
+                id_len = 1
+            
+        
+        ids = np.array([file]*id_len, dtype='S')
         ids = np.char.add(ids,choice.astype('S'))
            
         if f == 0: 
@@ -236,8 +267,10 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
             mdata_out = np.concat((mdata_out,mdata))
 
             ids_out = np.concat((ids_out, ids))
+
+    print(f"Only {mdata_out.shape[0]} particles available")
     
-    return (mdata_out,ids_out), nsub*len(files)
+    return (mdata_out,ids_out), mdata_out.shape[0]
 
     
 def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
@@ -252,28 +285,15 @@ def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
     """
     dset_path = config.dataset
 
-    if dset_path.endswith('.txt'):
-
-        part_locs, n_max = multi_mrcs(dset_path,config.num,rng)
-
-    elif dset_path.endswith('.mrcs'):
-        with mrcfile.open(dset_path) as f:
-            part_locs = f.data
-        n_max = part_locs.shape[0]
-
-    elif dset_path.endswith('.mrc'):
-        part_locs = glob(dset_path)
-        n_max = len(part_locs)
-        if n_max == 0:
-            print(f"Error: No mrc found in: {dset_path}")
-            sys.exit()
-
-    elif dset_path.endswith('.star'):
+    if dset_path.suffix == '.star':
         starfile = gemmi.cif.read_file(dset_path)
         block = starfile.find_block('particles')
         part_locs = list(block.find_values('_rlnimagename'))
         n_max = len(part_locs)
 
+    elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
+        part_locs, n_max = multi_mrcs(dset_path,config.num,rng)
+    
     else:
         print(f"Error: Invalid path specification: {dset_path}")
         sys.exit()
@@ -301,21 +321,7 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
     if stacks is None:
         stacks = {}
 
-    if dset_path.endswith('.txt'):
-
-        im = part_locs[0][x]
-        name_ids.append(part_locs[1][x])
-
-    elif dset_path.endswith('.mrcs'):
-        im = part_locs[x]
-        name_ids.append(f'{x+1}@{dset_path}')
-
-    elif dset_path.endswith('mrc'):
-        im_path = part_locs[x]
-        im = load_mrc(im_path)
-        name_ids.append(im_path)
-
-    elif dset_path.endswith('star'):
+    if dset_path.suffix == '.star':
         im_loc = part_locs[x]
         ind, stack_loc = im_loc.split('@')
         if stack_loc not in stacks:
@@ -324,6 +330,10 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
         im = stack if stack.ndim == 2 else stack[int(ind) - 1]
         name_ids.append(im_loc)
 
+    elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
+    
+        im = part_locs[0][x]
+        name_ids.append(part_locs[1][x])
     else:
         print(f"Error: Invalid path specification: {dset_path}")
         sys.exit()

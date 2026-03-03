@@ -35,7 +35,7 @@ import mrcfile
 import gemmi
 import cv2
 
-from clic.utils.spectral import bandpass_image, tight_mask
+from clic.utils.spectral import bandpass_image, tightmask
 
 
 def load_mrc(path: str) -> np.ndarray:
@@ -189,14 +189,17 @@ def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarr
     """
     if config.snr is not None:
         im = add_noise(im, rng, config.snr)
-    if config.tightmask:
-        mask = tight_mask(im)
-        im = im*mask
-        del mask
+
     im, _ = bandpass_image(
         im, low=config.lowpass, high=config.highpass,
         method=config.filter_method
         )
+    
+    if config.tightmask:
+        mask = tightmask(im)
+        im = im*mask
+        del mask   
+
     im = downscale(im, ds_size)
     im = stand_image(im)
     im = circular_mask(im)
@@ -222,8 +225,12 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
 
         with mrcfile.open(file,'r') as mfile:
 
-            mdata = mfile.data[rng.choice(len(mfile.data),size = nsub, replace = False)]
-        ids = [file]*nsub
+            choice = rng.choice(len(mfile.data),size = nsub, replace = False)
+            mdata = mfile.data[choice]
+        ids = np.array([file]*nsub, dtype='S')
+
+        ids = np.char.add(ids,choice.astype('S'))
+           
         if f == 0: 
             mdata_out = mdata
             ids_out = ids
@@ -232,10 +239,9 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
 
             mdata_out = np.concat((mdata_out,mdata))
 
-            ids_out.extend(ids)
-        #print(ids_out)
+            ids_out = np.concat((ids_out, ids))
     
-    return (mdata_out,ids_out), nsub*3
+    return (mdata_out,ids_out), nsub*len(files)
 
     
 def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
