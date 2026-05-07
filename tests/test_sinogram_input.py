@@ -26,8 +26,7 @@ class SinogramInputTest(unittest.TestCase):
         self.sino= mf.read(join(dirname(datasets.__file__), 
                                "000_2cg9_sinograms_100.mrcs"))[0]
 
-        self.lowpass = 10
-        self.highpass = 50
+
 
         config_data = {
             "dataset": "particle_list.txt",

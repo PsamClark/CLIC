@@ -31,12 +31,13 @@ from typing import Tuple, List, Any
 from glob import glob
 
 import numpy as np
+import pandas as pd
 from skimage.transform import radon, resize
 import mrcfile
-import gemmi
+import starfile
 import cv2
 
-from clic.utils.spectral import bandpass_image, tightmask
+from clic.utils.spectral import filter_image, tightmask
 
 
 def load_mrc(path: str) -> np.ndarray:
@@ -191,7 +192,7 @@ def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarr
     if config.snr is not None:
         im = add_noise(im, rng, config.snr)
 
-    im, _ = bandpass_image(
+    im, _ = filter_image(
         im, low=config.lowpass, high=config.highpass,
         pixel_size=config.pixel_size,
         method=config.filter_method
@@ -208,7 +209,9 @@ def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarr
     sino = make_sinogram(im, config.lines)
     return sino, im
 
-def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
+def multi_mrcs(dset_path: str, 
+               ntot: int, 
+               rng: np.random.RandomState) -> int:
     """
     Check if dataset path points to multiple .mrcs files.
 
@@ -220,7 +223,6 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
     """
 
     if 'mrc' in dset_path.suffix:
-        print(str(dset_path))
         files = glob(str(dset_path)) 
 
     elif 'txt' in dset_path.suffix:
@@ -243,11 +245,13 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
                     choice = rng.choice(len(mfile.data),
                                         size = nsub,
                                         replace = False)
+                    
                     mdata = mfile.data[choice]
                 
 
                 else:
                     mdata = mfile.data[:]
+                    choice = np.arange(len(mfile.data))
                 id_len = len(mdata)
             
             else:
@@ -255,9 +259,11 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
                 id_len = 1
             
         
-        ids = np.array([file]*id_len, dtype='S')
-        ids = np.char.add(ids,choice.astype('S'))
-           
+        fids = [str(file)]*id_len
+        nids = list(choice.astype(str))
+        ids = list(map('@'.join,zip(nids,fids)))
+        
+        ids = np.array(ids)
         if f == 0: 
             mdata_out = mdata
             ids_out = ids
@@ -267,10 +273,13 @@ def multi_mrcs(dset_path: str, ntot: int, rng) -> int:
             mdata_out = np.concat((mdata_out,mdata))
 
             ids_out = np.concat((ids_out, ids))
-
+    id_shuffle=np.arange(mdata_out.shape[0])
+    rng.shuffle(
+        id_shuffle)
+    
     print(f"Only {mdata_out.shape[0]} particles available")
     
-    return (mdata_out,ids_out), mdata_out.shape[0]
+    return (mdata_out[id_shuffle],ids_out[id_shuffle]), mdata_out.shape[0]
 
     
 def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
@@ -284,15 +293,25 @@ def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
         Tuple of (particle locations, number to use).
     """
     dset_path = config.dataset
+    optics=None
 
     if dset_path.suffix == '.star':
-        starfile = gemmi.cif.read_file(dset_path)
-        block = starfile.find_block('particles')
-        part_locs = list(block.find_values('_rlnimagename'))
-        n_max = len(part_locs)
+        metadata = starfile.read(dset_path)
+        particles = metadata['particles']
+        particles[["rlnStackID","rlnStackName"]] = particles.rlnImageName.str.split("@", expand=True)
+        particles['rlnStackID'] = particles['rlnStackID'].astype(int)
+
+        optics = metadata['optics']
+        n_max = len(particles)
+
+        choice = rng.choice(len(particles),
+                                        size = config.num,
+                                        replace = False)
+        
+        particles_sub = particles.iloc[choice].reset_index(drop=True)
 
     elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
-        part_locs, n_max = multi_mrcs(dset_path,config.num,rng)
+        particles_sub, n_max = multi_mrcs(dset_path,config.num,rng)
     
     else:
         print(f"Error: Invalid path specification: {dset_path}")
@@ -300,7 +319,7 @@ def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
 
     n = min(n_max, config.num)
     print(f"Will use {n} particles")
-    return part_locs, n
+    return particles_sub, optics, n
 
 
 def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
@@ -320,15 +339,14 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
     """
     if stacks is None:
         stacks = {}
-
     if dset_path.suffix == '.star':
-        im_loc = part_locs[x]
-        ind, stack_loc = im_loc.split('@')
+        parent = PurePath(dset_path).parent
+        stack_loc = part_locs.loc[x,'rlnStackName']
         if stack_loc not in stacks:
-            stacks[stack_loc] = load_mrc(stack_loc)
+            stacks[stack_loc] = load_mrc(str(PurePath(parent).joinpath(stack_loc)))
         stack = stacks[stack_loc]
-        im = stack if stack.ndim == 2 else stack[int(ind) - 1]
-        name_ids.append(im_loc)
+        im = stack if stack.ndim == 2 else stack[part_locs.loc[x,'rlnStackID']-1]
+        name_ids = part_locs
 
     elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
     
@@ -337,11 +355,11 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
     else:
         print(f"Error: Invalid path specification: {dset_path}")
         sys.exit()
-
     return im, name_ids
 
 
-def sinogram_main(config: Any, part_locs: Any, subset: List[int], rng
+def sinogram_main(config: Any, part_locs: Any, subset: List[int], optics: pd.DataFrame,
+                  rng
                   ) -> Tuple[np.ndarray, np.ndarray, int, List[str]]:
     """
     Main function to generate sinograms from a subset of particles.

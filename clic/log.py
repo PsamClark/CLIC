@@ -31,6 +31,7 @@ from glob import glob
 from pathlib import Path, PurePath
 import json
 import pandas as pd
+import numpy as np
 import h5py
 from .analysis.metrics import score_clustering
 
@@ -50,11 +51,12 @@ class Config(BaseModel):
     downscale: PositiveFloat = Field(1,description="downscaling")
     tightmask: bool = Field(False, description= "apply tightmask")
     filter_method: str = Field("butter",description="bandpass filter method")
-    lowpass: PositiveFloat = Field(5,description="lowpass filter value in angstrom")
+    lowpass: Optional[int] = Field(None,description="lowpass filter value in angstrom")
     highpass: Optional[int] = Field(None,description="highpass filter value in angstrom ")
     pixel_size: PositiveFloat = Field(1, description= "pixel size")
     snr: Optional[float] = Field(None, description="snr ratio to add noise to the image")
     model: str = Field("UMAP",description="Model type")
+    cluster_method: str = Field("hdbscan",description="method of clustering when unknown clusters")
 
     lines: PositiveInt = Field(120,description="number of sinogram lines")
     comps: PositiveInt = Field(3, description="number of dimensins to reduce to")
@@ -88,7 +90,6 @@ def store_config(config: Any, exp_id: str) -> None:
         None
     """
     config_dict = config.model_dump()
-    
     for key,val in config_dict.items():
 
         if isinstance(val, PurePath):
@@ -97,7 +98,7 @@ def store_config(config: Any, exp_id: str) -> None:
     Path("Configs").mkdir(exist_ok=True)
 
     with open(f"Configs/{exp_id}.json","w") as confile:
-        json.dump(config_dict, confile)
+        json.dump(config_dict, confile, indent=4)
 
 
 def load_config(fpath):
@@ -147,8 +148,10 @@ def collate_scores() -> None:
     for exp_conf in experiments:
         
         exp_id = Path(exp_conf).stem
+        print(exp_id)
 
         config = load_config(exp_conf)
+        print(config.model)
 
         score = score_clustering(exp_id)
         if score is None:
@@ -159,10 +162,39 @@ def collate_scores() -> None:
     features.append("accuracy")
     features.insert(0, "exp_id")
     out_df = pd.DataFrame(data=out_list, columns=features)
+    print(out_df['model'])
 
     cwd = Path.cwd()
     out_df.to_csv(f"{cwd.name}_cs.csv", index=False)
 
+def collate_configs() -> None:
+    """
+    Aggregate clustering scores and configuration features across experiments.
+
+    Returns:
+        None
+    """
+    experiments = glob("Configs/*.json")
+    out_list: List[List[Any]] = []
+
+    for exp_conf in experiments:
+        
+        exp_id = Path(exp_conf).stem
+
+        config = load_config(exp_conf)
+
+        conf_dict = config.model_dump()
+        features = list(conf_dict.keys())
+        values = list(conf_dict.values())
+        values.insert(0, exp_id)
+        features.insert(0, "exp_id")
+        out_list.append(values)
+
+    out_df = pd.DataFrame(data=out_list, columns=features)
+    print(out_df['model'])
+
+    cwd = Path.cwd()
+    out_df.to_csv(f"{cwd.name}_config_log.csv", index=False)
 
 def pop_features(config: Dict[str, Any], score: float,
                  out_list: List[List[Any]], exp_id: str
@@ -191,3 +223,6 @@ def pop_features(config: Dict[str, Any], score: float,
 
     return features, out_list
 
+def ohk_to_label(matrix):
+
+    return(np.argmax(matrix,axis=-1))

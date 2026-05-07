@@ -46,18 +46,21 @@ def cluster_accuracy(cc_piv: pd.DataFrame) -> float:
 
     cc_vals = cc_piv.values
     total = np.sum(cc_vals)
+    classes = cc_vals.shape[1]
 
     if cc_piv.index[0] == -1:
         cc_vals = cc_vals[1:]
-
-    perms = permutations(np.arange(len(cc_vals)))
+    if cc_vals.shape[0] < cc_vals.shape[1]:
+        cc_vals=cc_vals.T
+    perms = permutations(np.arange(len(cc_vals)),cc_vals.shape[1])
     stored_count = 0
-
     for pp in perms:
-        count = sum(cc_vals[i, pp[i]] for i in range(len(pp)))
+        count = sum(cc_vals[pp[i],i] for i in range(len(pp)))
         stored_count = max(stored_count, count)
 
     correct = stored_count / float(total) * 100
+    if correct < (100/classes):
+        correct = (100/classes)
     return correct
 
 
@@ -120,7 +123,7 @@ def plot_clustering(exp_id: Union[str, int], dir = None) -> None:
         None
     """
     sns.heatmap(
-        optimize_clustering(f"exp_{exp_id}",dir = dir),
+        optimize_clustering(exp_id,dir = dir),
         annot=True,
         fmt="d",
         cbar=False

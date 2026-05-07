@@ -14,9 +14,12 @@ Functions:
 import time
 from typing import List, Tuple 
 import gemmi
+import starfile
+import pandas as pd
+import numpy as np
 
 
-def create(ids: List[str], clic_dir: str) -> gemmi.cif.Document:
+def create(ids: List[str], optics, clic_dir: str) -> None:
     """
     Create initial STAR file with particle IDs and image names.
 
@@ -27,16 +30,19 @@ def create(ids: List[str], clic_dir: str) -> gemmi.cif.Document:
     Returns:
         Gemmi CIF Document object.
     """
-    out_doc = gemmi.cif.Document()
-    block = out_doc.add_new_block('particles')
-    tags = ['_id', '_rlnimagename']
-    loop = block.init_loop('', tags)
+    file_name = f"{clic_dir}/particles.star"
+    print(type(ids))
+    if isinstance(ids, list):
 
-    loop.add_row([f'-1\t', f'z_score\t'])  # z scores
-    for x in range(1, len(ids)):
-        loop.add_row([f'{x}\t', f'{ids[x]}\t'])
-
-    out_doc.write_file(f'{clic_dir}/particles.star')
+        starfile.write({
+            'particles':pd.DataFrame(
+            {
+                'rlnImageName': ids
+            })}, file_name
+        )
+    else:
+        print("hello")
+        starfile.write({'optics': optics,'particles':ids}, file_name)
 
 
 def update_data(tags: List[str], labels: List[str], table: List[List[str]], it: int
@@ -71,59 +77,19 @@ def end_write(tags: List[str], table: List[List[str]],
         clic_dir: Output directory.
         ids: List of image identifiers.
     """
-    new_doc = gemmi.cif.Document()
-    block = new_doc.add_new_block('particles')
-    loop = block.init_loop('', tags)
-
-    row1 = ['-', 'z_score']
-
-    row1.extend(z_score_list)
-    loop.add_row(row1)
-
-    for x, ent in enumerate(ids):
-        row = [f'{x}\t', f'{ent}\t'] 
-        row.extend(table[x])       
-        loop.add_row(row)
-
-    new_doc.write_file(f'{clic_dir}/particles_CLIC.star')
+    if isinstance(ids,pd.DataFrame):
+        ids=ids['rlnImageName']
 
 
-def update(star_file: gemmi.cif.Document, labels: List[str], it: int,
-           z_score: str, clic_dir: str) -> gemmi.cif.Document:
-    """
-    Legacy method to update STAR file with new iteration and z-score.
+    cluster_table = pd.DataFrame(table , columns=tags)
 
-    Args:
-        star_file: Existing STAR file as Gemmi Document.
-        labels: Classification labels for current iteration.
-        it: Iteration number.
-        z_score: Z-score value.
-        clic_dir: Output directory.
+    cluster_table['rlnZScore'] = z_score_list
 
-    Returns:
-        Updated Gemmi Document.
-    """
-    block = star_file.find_block('particles')
-    table = block.find_loop('_id').get_loop()
-    tags = table.tags
-    tags.append(f'_it{it}')
 
-    new_doc = gemmi.cif.Document()
-    block_temp = new_doc.add_new_block('particles')
-    loop = block_temp.init_loop('', tags)
+    cluster_table['rlnID'] = np.arange(len(ids))
 
-    # Add z-score row
-    row = list(table[0])
-    row.append(f'{z_score}')
-    loop.add_row(row)
+    cluster_table['rlnImageName'] = ids
+    
+    starfile.write({'particles': cluster_table}, f'{clic_dir}/particles_CLIC.star')
 
-    tot_time = 0
-    for i in range(1, len(table)):
-        st_time = time.time()
-        new_row = list(table[i])
-        new_row.append(f'{labels[i]}\t')
-        loop.add_row(new_row)
-        tot_time += time.time() - st_time
 
-    print(f"Update time: {tot_time:.4f} seconds")
-    new_doc.write_file(f'{clic_dir}/particles_CLIC_old.star')
