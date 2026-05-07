@@ -1,3 +1,4 @@
 [console_scripts]
-clic-log = clic.log:collate_scores
+clic-log-configs = clic.log:collate_configs
+clic-log-scores = clic.log:collate_scores
 clic-run = clic.main:run

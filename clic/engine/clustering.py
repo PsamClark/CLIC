@@ -29,8 +29,10 @@ from itertools import permutations
 import numpy as np
 from sklearn.metrics.pairwise import euclidean_distances as eucl_dist
 import matplotlib.pyplot as plt
+from scipy import stats 
 from scipy.cluster.hierarchy import  fcluster
 from numba import cuda
+from sklearn.cluster import DBSCAN, HDBSCAN,OPTICS
 
 from clic.inout.star_writer import end_write, update_data
 
@@ -345,7 +347,7 @@ def update_cl(cluster_dict, scoretable, cluster_labels, z, z_corr):
         a = a[0]
         b = b[0]
 
-    print(a)
+
     paired = (cluster_labels[int(a)], cluster_labels[int(b)])
     p0 = np.min(paired)  # By convention new group name is lowest of two
     p1 = np.max(paired)
@@ -450,6 +452,32 @@ def center_sctble(scoretable):
     scoretable = scoretable/mean
     return scoretable
 
+def clustering_unknown(lines,config,centroids=True):
+    
+    if config.cluster_method == "optics":
+        model = OPTICS(min_cluster_size=int(0.05*config.num))
+
+    elif config.cluster_method == "hdbscan":
+        model = HDBSCAN(copy=True, min_cluster_size=int(0.05*config.num))
+
+    if centroids:
+        sinos = np.reshape(
+            np.ascontiguousarray(lines),
+            (config.num, config.lines, config.comps))
+        sinos = np.mean(sinos,axis=1)
+        model.fit(sinos)
+
+        clusters = model.labels_
+    else:
+        model.fit(lines)
+        line_clusters=np.reshape(np.ascontiguousarray(model.labels_),
+                                 (config.num, config.lines))
+        clusters = stats.mode(line_clusters, axis=1).mode
+    num_clusters = len(list(set(clusters)))
+
+    return clusters, num_clusters
+
+
 
 def clustering_main(lines, config, clic_dir, ids):
     """
@@ -465,6 +493,10 @@ def clustering_main(lines, config, clic_dir, ids):
         np.ndarray or None: Final cluster assignments if num_clusters is set,
         else None.
     """
+    if config.clusters is None:
+
+        return clustering_unknown(lines, config,centroids=False)
+    
     cl_labels = list(range(config.num))
     cl_dict = initial_dict(lines, config.num)
     if config.gpu:
@@ -505,7 +537,6 @@ def clustering_main(lines, config, clic_dir, ids):
     all_paired = []
     z = []  # Linkage matrix for drawing dendrogram
     z_corr = list(range(config.num))
-    tags = ['_id', '_path']  # tags for star file
     z_score_list = []  # tags for star file
     table = np.ndarray((config.num, config.num -1), dtype=object)
 
@@ -553,8 +584,8 @@ def clustering_main(lines, config, clic_dir, ids):
             current_cl = sum(1 if cl_freq[cl] > int(0.05*config.num) else 0 for cl in cl_freq)
             runs += 1
 
-        return auto_cl
-
+        return auto_cl,current_cl
+    
 
 def score_bins(gt, exp, config):
     """

@@ -50,7 +50,8 @@ Changelog = "https://github.com/PsamClark/CLIC/master/CHANGELOG.md"
 
 [project.scripts]
 clic-run = "clic.main:run"
-clic-log = "clic.log:collate_scores"
+clic-log-scores = "clic.log:collate_scores"
+clic-log-configs = "clic.log:collate_configs"
 
 
 [tool.setuptools]

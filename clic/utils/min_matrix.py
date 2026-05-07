@@ -21,6 +21,7 @@ Dependencies:
     - clustering.score_bins
 """
 from itertools import permutations
+import collections
 from typing import List, Tuple
 import numpy as np
 
@@ -60,10 +61,12 @@ def make_slice(lin_batch: List[int], batch_ids: List[int], bnd: Tuple[int, int, 
     """
     _, n, d = bnd
     batch = np.zeros((n, d), dtype=int)
+    top_classes = {key:val for key,val in collections.Counter(lin_batch).items() if val>int(0.05*n)}
+    top_classes=list(top_classes.keys())
     for i, i_class in enumerate(lin_batch):
         g_id = batch_ids[i]
-        if 0 <= i_class < d:
-            batch[g_id, i_class] = 1
+        if i_class in top_classes:
+            batch[g_id, top_classes.index(i_class)] = 1
     return batch
 
 
@@ -95,9 +98,12 @@ def align_batches(matrix: np.ndarray) -> np.ndarray:
     Returns:
         Aligned matrix of shape (b × n × d).
     """
-    _, n, d = matrix.shape
+    b, n, d = matrix.shape
     aligned_matrix = np.array([matrix[0]], dtype=int)
+    if b==1:
+        return aligned_matrix
     perm_list = list(permutations(range(d)))
+
 
     for batch in matrix[1:]:
         scores = [score_align(batch, aligned_matrix, p) for p in perm_list]
@@ -112,5 +118,4 @@ def align_batches(matrix: np.ndarray) -> np.ndarray:
                 opt_batch[i, shift_c] = 1
 
         aligned_matrix = np.concatenate((aligned_matrix, [opt_batch]))
-
     return aligned_matrix
