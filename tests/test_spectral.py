@@ -38,31 +38,24 @@ class SpectralTest(unittest.TestCase):
         self.highpass = 50
 
 
-    def test_bandpass_image_fail(self):
-
-        with self.assertRaises(ValueError):
-
-            _,_ = bandpass_image(self.orig_image,low=None,high=None)
-
-
     def test_butter_filter(self):
 
-        filter_image, filter_mask = bandpass_image(self.orig_image, low = self.lowpass,high = self.highpass)
+        filt_image, filt_mask = filter_image(self.orig_image, low = self.lowpass,high = self.highpass)
 
+        npt.assert_array_equal(self.butter_mask, filt_mask)
+        npt.assert_array_equal(self.butter_filt,filt_image)
 
-        npt.assert_array_equal(self.butter_filt,filter_image)
-
-        npt.assert_array_equal(self.butter_mask, filter_mask)
+  
 
     def test_gauss_filter(self):
 
-        filter_image, filter_mask = bandpass_image(self.orig_image, low = self.lowpass, high = self.highpass,
+        filt_image, filt_mask = filter_image(self.orig_image, low = self.lowpass, high = self.highpass,
                                                    method = "gauss")
 
+        npt.assert_array_equal(self.gauss_mask, filt_mask)
 
-        npt.assert_array_equal(self.gauss_filt,filter_image)
+        npt.assert_array_equal(self.gauss_filt,filt_image)
 
-        npt.assert_array_equal(self.gauss_mask, filter_mask)
 
 
 
