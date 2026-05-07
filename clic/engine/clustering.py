@@ -35,6 +35,7 @@ from numba import cuda
 from sklearn.cluster import DBSCAN, HDBSCAN,OPTICS
 
 from clic.inout.star_writer import end_write, update_data
+from clic.log import Config
 
 
 def initial_dict(lines, num):
@@ -452,7 +453,7 @@ def center_sctble(scoretable):
     scoretable = scoretable/mean
     return scoretable
 
-def clustering_unknown(lines,config,centroids=True):
+def clustering_unknown(lines: np.ndarray,config:Config, centroids: bool = True):
     
     if config.cluster_method == "optics":
         model = OPTICS(min_cluster_size=int(0.05*config.num))
@@ -477,6 +478,13 @@ def clustering_unknown(lines,config,centroids=True):
 
     return clusters, num_clusters
 
+def get_centroids(line_data: np.ndarray,nlines:int) -> np.ndarray:
+
+    sinodata = np.reshape(
+                np.ascontiguousarray(line_data),
+                (int(line_data.shape[0]/nlines), nlines, line_data.shape[-1]))
+    
+    return np.mean(sinodata,axis=1)
 
 
 def clustering_main(lines, config, clic_dir, ids):

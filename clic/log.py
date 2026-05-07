@@ -98,7 +98,7 @@ def store_config(config: Any, exp_id: str) -> None:
     Path("Configs").mkdir(exist_ok=True)
 
     with open(f"Configs/{exp_id}.json","w") as confile:
-        json.dump(config_dict, confile)
+        json.dump(config_dict, confile, indent=4)
 
 
 def load_config(fpath):
