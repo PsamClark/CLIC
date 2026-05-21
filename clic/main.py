@@ -73,6 +73,12 @@ if not sys.warnoptions:
 @click.option("-tm", "--tightmask",
               help = "apply tightmask before filtering",
               is_flag=True)
+@click.option("-cp", "--centre-particles",
+              help = "center particles if star file with devaitions exists",
+              is_flag=True)
+@click.option("-ctf", "--apply-ctf-correction",
+              help = "apply CTF correction to image if CTF data is available",
+              is_flag=True)
 @click.option("-fm", "--filter_method",
               help = "image filter method",
               default="butter", type=str)
@@ -109,6 +115,8 @@ def run(dataset,
         filter_method,
         comps,
         model,
+        apply_ctf_correction,
+        centre_particles, 
         cluster_method,
         save_model,
         lines,
@@ -183,7 +191,7 @@ def run(dataset,
 
             if config.save_model:
                 np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
-                np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
+                np.save(f"{batch_dir}/lines_reddim.npy",get_centroids(lines_reddim,config.lines))
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
 
             

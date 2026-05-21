@@ -54,6 +54,8 @@ class Config(BaseModel):
     lowpass: Optional[int] = Field(None,description="lowpass filter value in angstrom")
     highpass: Optional[int] = Field(None,description="highpass filter value in angstrom ")
     pixel_size: PositiveFloat = Field(1, description= "pixel size")
+    apply_ctf_correction: bool = Field(False, description="perform ctf correction")
+    centre_particles: bool = Field(False, description="centre particles based on Class2D")
     snr: Optional[float] = Field(None, description="snr ratio to add noise to the image")
     model: str = Field("UMAP",description="Model type")
     cluster_method: str = Field("hdbscan",description="method of clustering when unknown clusters")

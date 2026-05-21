@@ -31,7 +31,6 @@ def create(ids: List[str], optics, clic_dir: str) -> None:
         Gemmi CIF Document object.
     """
     file_name = f"{clic_dir}/particles.star"
-    print(type(ids))
     if isinstance(ids, list):
 
         starfile.write({
@@ -41,7 +40,6 @@ def create(ids: List[str], optics, clic_dir: str) -> None:
             })}, file_name
         )
     else:
-        print("hello")
         starfile.write({'optics': optics,'particles':ids}, file_name)
 
 

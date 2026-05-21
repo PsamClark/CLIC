@@ -25,6 +25,7 @@ Dependencies:
 """
 
 import sys
+from typing import Optional
 import random
 from pathlib import PurePath
 from typing import Tuple, List, Any
@@ -37,7 +38,7 @@ import mrcfile
 import starfile
 import cv2
 
-from clic.utils.spectral import filter_image, tightmask
+from clic.utils.spectral import filter_image, tightmask, recentre_image
 
 
 def load_mrc(path: str) -> np.ndarray:
@@ -176,8 +177,26 @@ def gblur(im: np.ndarray) -> np.ndarray:
     """
     return cv2.GaussianBlur(im, (5, 5), 0)
 
+def populate_ctf_params(part_locs: pd.DataFrame, optics: pd.DataFrame) -> dict:
 
-def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarray, np.ndarray]:
+    ctf_params = {
+
+                            'defocusu': part_locs.loc["rlnDefocusU"],
+                            'defocusv': part_locs['rlnDefocusV'],
+                            'defocus_angle': part_locs['rlnDefocusAngle'],
+                            'pixel_size': optics['rlnImagePixelSize'][0],
+                            'voltage': optics['rlnVoltage'][0],
+                            'spherical_abberation': optics['rlnSphericalAberration'][0],
+                            'amplitude_contrast': optics['rlnAmplitudeContrast'][0]
+
+    }
+
+    return ctf_params
+
+def preprocess(im: np.ndarray, config: Any,ds_size, 
+               part_locs: Optional[pd.DataFrame]= None, optics: Optional[pd.DataFrame] = None, 
+                rng = None) -> Tuple[np.ndarray, np.ndarray]:
+    
     """
     Apply full preprocessing pipeline to image.
 
@@ -191,17 +210,31 @@ def preprocess(im: np.ndarray, config: Any, ds_size: int, rng) -> Tuple[np.ndarr
     """
     if config.snr is not None:
         im = add_noise(im, rng, config.snr)
+    
+    ctf_params = None
+
+    if config.apply_ctf_correction:
+
+        ctf_params = populate_ctf_params(part_locs, optics)
 
     im, _ = filter_image(
-        im, low=config.lowpass, high=config.highpass,
+        im, 
+        low=config.lowpass, high=config.highpass,
         pixel_size=config.pixel_size,
-        method=config.filter_method
+        ctf_params=ctf_params,
+        method=config.filter_method,
         )
     
     if config.tightmask:
         mask = tightmask(im)
         im = im*mask
         del mask   
+    if config.centre_particles:
+      x_shift = np.round(part_locs.loc['rlnOriginXAngst']/optics.loc[0,'rlnImagePixelSize']).astype(int)
+      y_shift = np.round(part_locs.loc['rlnOriginYAngst']/optics.loc[0,'rlnImagePixelSize']).astype(int)
+
+      im = recentre_image(im, y_shift, x_shift)
+
 
     im = downscale(im, ds_size)
     im = stand_image(im)
@@ -383,8 +416,7 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int], optics: pd.Dat
             ds_size = int(im.shape[0] // config.downscale)
             all_sinos = np.zeros((subsize, config.lines, ds_size))
             all_ims = np.zeros((subsize, ds_size, ds_size))
-
-        sino,imout = preprocess(im, config, ds_size, rng)
+        sino,imout = preprocess(im, config, part_locs.loc[x], optics, ds_size, rng)
         all_sinos[x] = sino
         all_ims[x] = imout
 
