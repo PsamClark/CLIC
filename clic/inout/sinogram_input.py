@@ -416,7 +416,7 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int], optics: pd.Dat
             ds_size = int(im.shape[0] // config.downscale)
             all_sinos = np.zeros((subsize, config.lines, ds_size))
             all_ims = np.zeros((subsize, ds_size, ds_size))
-        sino,imout = preprocess(im, config, part_locs.loc[x], optics, ds_size, rng)
+        sino,imout = preprocess(im, config, ds_size, part_locs.loc[x], optics, rng)
         all_sinos[x] = sino
         all_ims[x] = imout
 
