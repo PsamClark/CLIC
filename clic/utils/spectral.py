@@ -95,13 +95,13 @@ def spectrum2d(image: np.ndarray) -> np.ndarray:
 
 
 def filter_image(image: np.ndarray,
-                   low: Optional[float] = None,
-                   high: Optional[float] = None,
-                   width: int = 5,
-                   order: int = 2,
-                   pixel_size: float = 1,
-                   ctf_params: Optional[dict] = None, 
-                   method: str = "butter") -> Tuple[np.ndarray, np.ndarray]:
+                low: Optional[float] = None,
+                high: Optional[float] = None,
+                width: int = 5,
+                order: int = 2,
+                pixel_size: float = 1,
+                ctf_params: Optional[dict] = None, 
+                method: str = "butter") -> Tuple[np.ndarray, np.ndarray]:
     """
     Apply bandpass filter to image in Fourier domain.
 
@@ -130,7 +130,7 @@ def filter_image(image: np.ndarray,
 
         mask = bandpass_mask(spec, lpass, hpass, width, order, method)
 
-    if ctf_params is not None:
+    if  ctf_params is not None:
         
         ctf=generate_ctf(image.shape[0],**ctf_params)
 
@@ -365,8 +365,7 @@ def calculate_snr(image):
 
 def recentre_image(image,x_offset, y_offset):
 
-    print(x_offset)
-    print(y_offset)
+
 
     if x_offset > 0:
         im2 = np.pad(image, ((x_offset, 0), (0, 0)), mode='constant')

@@ -40,7 +40,7 @@ import collections
 from .inout.sinogram_input import sinogram_main
 from .inout.sinogram_input import get_part_locs
 from .engine.dim_red import fitmodel
-from .engine.clustering import clustering_main
+from .engine.clustering import clustering_main, get_centroids
 from .log import random_string, ohk_to_label
 from .log import Config, store_config, store_images
 from .inout.star_writer import create
@@ -72,6 +72,12 @@ if not sys.warnoptions:
               default=1, type=float)
 @click.option("-tm", "--tightmask",
               help = "apply tightmask before filtering",
+              is_flag=True)
+@click.option("-cp", "--centre-particles",
+              help = "center particles if star file with devaitions exists",
+              is_flag=True)
+@click.option("-ctf", "--apply-ctf-correction",
+              help = "apply CTF correction to image if CTF data is available",
               is_flag=True)
 @click.option("-fm", "--filter_method",
               help = "image filter method",
@@ -109,6 +115,8 @@ def run(dataset,
         filter_method,
         comps,
         model,
+        apply_ctf_correction,
+        centre_particles, 
         cluster_method,
         save_model,
         lines,
@@ -161,7 +169,7 @@ def run(dataset,
 
         all_sinos, all_ims, num, name_ids = sinogram_main(config, part_locs,
                                                                   batch, optics, rng)
-        if b == 1:
+        if b == 0:
             store_images(all_ims, all_sinos, name_ids, exp_dir)
         if isinstance(name_ids, pd.DataFrame):
 
@@ -183,7 +191,7 @@ def run(dataset,
 
             if config.save_model:
                 np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
-                np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
+                np.save(f"{batch_dir}/lines_reddim.npy",get_centroids(lines_reddim,config.lines))
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
 
             

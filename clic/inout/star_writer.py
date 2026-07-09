@@ -31,7 +31,6 @@ def create(ids: List[str], optics, clic_dir: str) -> None:
         Gemmi CIF Document object.
     """
     file_name = f"{clic_dir}/particles.star"
-    print(type(ids))
     if isinstance(ids, list):
 
         starfile.write({
@@ -41,7 +40,6 @@ def create(ids: List[str], optics, clic_dir: str) -> None:
             })}, file_name
         )
     else:
-        print("hello")
         starfile.write({'optics': optics,'particles':ids}, file_name)
 
 
@@ -61,7 +59,7 @@ def update_data(tags: List[str], labels: List[str], table: List[List[str]], it: 
     """
     tags.append(f'_it{it}')
     for i, row in enumerate(table):
-        row[it] = f'{labels[i]}\t'
+        row[it] = f'{labels[i]}'
     return tags, table
 
 
@@ -81,15 +79,14 @@ def end_write(tags: List[str], table: List[List[str]],
         ids=ids['rlnImageName']
 
 
+    table = np.insert(table,0,z_score_list,axis=0)
     cluster_table = pd.DataFrame(table , columns=tags)
 
-    cluster_table['rlnZScore'] = z_score_list
 
+    cluster_table['rlnID'] = np.insert(np.arange(len(ids)), 0, 0)
 
-    cluster_table['rlnID'] = np.arange(len(ids))
-
-    cluster_table['rlnImageName'] = ids
-    
+    cluster_table['rlnImageName'] = np.insert(ids,0,'z_score')
+    print(cluster_table)
     starfile.write({'particles': cluster_table}, f'{clic_dir}/particles_CLIC.star')
 
 
