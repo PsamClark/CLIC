@@ -134,7 +134,6 @@ def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> Non
     with h5py.File(f"{exp_id}/batch1_images.hdf5", "w") as imfile:
         imfile.create_dataset('images', data=all_ims)
         imfile.create_dataset('sinograms', data=all_sinos)
-        imfile.create_dataset('ids', data=all_ids)
 
 
 def collate_scores() -> None:

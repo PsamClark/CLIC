@@ -40,7 +40,7 @@ import collections
 from .inout.sinogram_input import sinogram_main
 from .inout.sinogram_input import get_part_locs
 from .engine.dim_red import fitmodel
-from .engine.clustering import clustering_main
+from .engine.clustering import clustering_main, get_centroids
 from .log import random_string, ohk_to_label
 from .log import Config, store_config, store_images
 from .inout.star_writer import create
@@ -169,7 +169,7 @@ def run(dataset,
 
         all_sinos, all_ims, num, name_ids = sinogram_main(config, part_locs,
                                                                   batch, optics, rng)
-        if b == 1:
+        if b == 0:
             store_images(all_ims, all_sinos, name_ids, exp_dir)
         if isinstance(name_ids, pd.DataFrame):
 

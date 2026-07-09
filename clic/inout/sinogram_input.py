@@ -345,7 +345,7 @@ def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
 
     elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
         particles_sub, n_max = multi_mrcs(dset_path,config.num,rng)
-    
+        print(particles_sub)
     else:
         print(f"Error: Invalid path specification: {dset_path}")
         sys.exit()
@@ -416,7 +416,13 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int], optics: pd.Dat
             ds_size = int(im.shape[0] // config.downscale)
             all_sinos = np.zeros((subsize, config.lines, ds_size))
             all_ims = np.zeros((subsize, ds_size, ds_size))
-        sino,imout = preprocess(im, config, ds_size, part_locs.loc[x], optics, rng)
+        if config.dataset.suffix in [".mrcs",".mrc",".txt"]:
+            part_info = None
+
+        else:
+            part_info = part_locs.loc[x]
+
+        sino,imout = preprocess(im, config, ds_size, part_info, optics, rng)
         all_sinos[x] = sino
         all_ims[x] = imout
 

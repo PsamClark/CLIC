@@ -545,6 +545,7 @@ def clustering_main(lines, config, clic_dir, ids):
     all_paired = []
     z = []  # Linkage matrix for drawing dendrogram
     z_corr = list(range(config.num))
+    tags = []
     z_score_list = []  # tags for star file
     table = np.ndarray((config.num, config.num -1), dtype=object)
 
