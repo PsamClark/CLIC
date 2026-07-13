@@ -79,7 +79,8 @@ def tightmask(image: np.ndarray, lpass: int = 8,
     gauss_tmask = cv2.GaussianBlur(dilated, (gkern_size, gkern_size), 0)
     return gauss_tmask.astype(np.float32)
 
-def spectrum2d(image: np.ndarray) -> np.ndarray:
+
+def Re2Fo(image: np.ndarray) -> np.ndarray:
     """
     Compute 2D Fourier spectrum of image.
 
@@ -92,6 +93,21 @@ def spectrum2d(image: np.ndarray) -> np.ndarray:
     if image.shape[0] | image.shape[1] > 1024:
         image = resize(image, (1024, 1024))
     return np.fft.fftshift(np.fft.fftn(image))
+
+def Fo2Re(four_trans: np.ndarray,im_shape: list) -> np.ndarray:
+    """
+    Compute 2D Fourier spectrum of image.
+
+    Args:
+        image: Input image.
+
+    Returns:
+        Shifted 2D Fourier spectrum.
+    """
+    image = np.fft.ifftn(np.fft.ifftshift(four_trans))
+    if im_shape[0] | im_shape[1] != four_trans.shape[0]: 
+        image = resize(image, im_shape)
+    return image
 
 
 def filter_image(image: np.ndarray,
@@ -117,30 +133,42 @@ def filter_image(image: np.ndarray,
     Returns:
         Tuple of (filtered image, filter mask).
     """
+    original_shape=image.shape
+    if len(original_shape) == 2:
+        image = image[np.newaxis]
 
-
-    spec = spectrum2d(image)
+    spec = np.array([Re2Fo(x) for x in image])
 
     if low is None and high is None:
-        mask=np.ones(spec.shape)
+        mask=np.ones(spec.shape[1:])
 
     else:
-        lpass = np.inf if low is None else spec.shape[0] * pixel_size / low
-        hpass = 0 if high is None else spec.shape[0] * pixel_size / high
+        lpass = np.inf if low is None else spec.shape[1] * pixel_size / low
+        hpass = 0 if high is None else spec.shape[1] * pixel_size / high
 
         mask = bandpass_mask(spec, lpass, hpass, width, order, method)
+        mask = mask[np.newaxis].repeat(image.shape[0],0)
 
     if  ctf_params is not None:
         
-        ctf=generate_ctf(image.shape[0],**ctf_params)
+        ctfs= np.array([generate_ctf(image.shape[1],**ctf_pms) for ctf_pms in ctf_params])
 
-        mask *= ctf
+        mask *= ctfs
     bp_spec = spec*mask
-    filt_im = np.fft.ifftn(np.fft.ifftshift(bp_spec)).real
-    filt_im = (filt_im - np.min(filt_im)) / np.ptp(filt_im) * 255
+    filt_im = np.array([Fo2Re(x,original_shape).real for x in bp_spec])
+    filt_im = np.array([standardise_image(x) for x in filt_im])
 
-    return filt_im.astype(np.uint8), mask.astype(np.float32)
+    if len(original_shape) == 2:
+        filt_im = filt_im[0]
 
+
+    return filt_im, mask[0].astype(np.float32)
+
+def standardise_image(image: np.ndarray) -> np.ndarray:
+
+    image = (image - np.min(image)) / np.ptp(image) * 255
+
+    return image.astype(np.uint8)
 
 def bandpass_mask(image: np.ndarray,
              low: float = np.inf,
@@ -249,7 +277,7 @@ def correct_ctf(
         method="flip"
         ):
     
-    spec=spectrum2d(image)
+    spec=Re2Fo(image)
 
     ctf=generate_ctf(
         spec,
@@ -363,23 +391,47 @@ def calculate_snr(image):
     return np.mean(image)/np.std(get_image_outer(image))
 
 
-def recentre_image(image,x_offset, y_offset):
+def recentre_image(images,part_locs, optics):
+
+    centered_images = np.zeros(images.shape)
+
+    for i,image in enumerate(images):
+
+        x_offset = np.round(part_locs.loc[i,'rlnOriginXAngst']/optics.loc[0,'rlnImagePixelSize']).astype(int)
+        y_offset = np.round(part_locs.loc[i,'rlnOriginYAngst']/optics.loc[0,'rlnImagePixelSize']).astype(int)
 
 
+        if x_offset > 0:
+            im2 = np.pad(image, ((x_offset, 0), (0, 0)), mode='constant')
+            im2 = im2[:image.shape[0]-x_offset, :]
+        else:
+            im2 = np.pad(image, ((0, -x_offset), (0, 0)), mode='constant')
+            im2 = im2[-x_offset:, :]
 
-    if x_offset > 0:
-        im2 = np.pad(image, ((x_offset, 0), (0, 0)), mode='constant')
-        im2 = im2[:image.shape[0]-x_offset, :]
-    else:
-        im2 = np.pad(image, ((0, -x_offset), (0, 0)), mode='constant')
-        im2 = im2[-x_offset:, :]
+        if y_offset > 0:
+            im3 = np.pad(im2, ((0, 0), (y_offset, 0)), mode='constant')
+            im3 = im3[:, :image.shape[0]-y_offset]
 
-    if y_offset > 0:
-        im3 = np.pad(im2, ((0, 0), (y_offset, 0)), mode='constant')
-        im3 = im3[:, :image.shape[0]-y_offset]
+        else:
+            im3 = np.pad(im2, ((0, 0), (0, -y_offset)), mode='constant')
+            im3 = im3[:, -y_offset:]
 
-    else:
-        im3 = np.pad(im2, ((0, 0), (0, -y_offset)), mode='constant')
-        im3 = im3[:, -y_offset:]
+        centered_images[i] = im3
+    return centered_images
 
-    return im3
+
+def compute_radial_profile(data: np.ndarray) -> np.ndarray:
+    """Computes the 2D radial average profile of a square matrix."""
+    y, x = np.indices(data.shape)
+    center = np.array(data.shape) // 2
+    r = np.sqrt((x - center[1])**2 + (y - center[0])**2)
+    r = r.astype(int)
+
+    # Sum values and count pixels at each radius
+    tbin = np.bincount(r.ravel(), data.ravel())
+    nr = np.bincount(r.ravel())
+    radial_profile = tbin / nr
+    
+    # Map the 1D profile back to a 2D image
+    radial_map = radial_profile[r]
+    return radial_map

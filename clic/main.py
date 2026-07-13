@@ -191,7 +191,7 @@ def run(dataset,
 
             if config.save_model:
                 np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
-                np.save(f"{batch_dir}/lines_reddim.npy",get_centroids(lines_reddim,config.lines))
+                np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
 
             

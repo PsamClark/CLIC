@@ -56,7 +56,7 @@ def load_mrc(path: str) -> np.ndarray:
     return image
 
 
-def stand_image(image: np.ndarray) -> np.ndarray:
+def stand_image(images: np.ndarray) -> np.ndarray:
     """
     Standardize image to zero mean and unit variance.
 
@@ -66,7 +66,7 @@ def stand_image(image: np.ndarray) -> np.ndarray:
     Returns:
         Standardized image.
     """
-    return (image - np.mean(image)) / np.std(image)
+    return np.array([(x - np.mean(x)) / np.std(x) for x in images])
 
 
 def add_noise(image: np.ndarray, rng, snr: float = 1) -> np.ndarray:
@@ -114,10 +114,10 @@ def downscale(image: np.ndarray, ds: int) -> np.ndarray:
     Returns:
         Resized image.
     """
-    return resize(image, (ds, ds), anti_aliasing=True)
+    return np.array([resize(x, (ds, ds), anti_aliasing=True) for x in image])
 
 
-def circular_mask(im: np.ndarray) -> np.ndarray:
+def circular_mask(image: np.ndarray) -> np.ndarray:
     """
     Apply circular mask to image to reduce edge artifacts.
 
@@ -127,13 +127,14 @@ def circular_mask(im: np.ndarray) -> np.ndarray:
     Returns:
         Masked image.
     """
-    h, w = im.shape
+    n, h, w = image.shape
     center = (w // 2, h // 2)
     radius = min(center[0], center[1], w - center[0], h - center[1])
     y, x = np.ogrid[:h, :w]
     dist = np.sqrt((x - center[0]) ** 2 + (y - center[1]) ** 2)
     mask = dist <= radius
-    return im * mask
+    mask = mask.reshape(1,mask.shape[0], mask.shape[1]).repeat(n, 0)
+    return image * mask
 
 
 def make_sinogram(image: np.ndarray, nlines: int = 120) -> np.ndarray:
@@ -179,21 +180,21 @@ def gblur(im: np.ndarray) -> np.ndarray:
 
 def populate_ctf_params(part_locs: pd.DataFrame, optics: pd.DataFrame) -> dict:
 
-    ctf_params = {
+    ctf_params = [{
 
-                            'defocusu': part_locs.loc["rlnDefocusU"],
-                            'defocusv': part_locs['rlnDefocusV'],
-                            'defocus_angle': part_locs['rlnDefocusAngle'],
+                            'defocusu': part_locs.loc[i,"rlnDefocusU"],
+                            'defocusv': part_locs.loc[i,'rlnDefocusV'],
+                            'defocus_angle': part_locs.loc[i,'rlnDefocusAngle'],
                             'pixel_size': optics['rlnImagePixelSize'][0],
                             'voltage': optics['rlnVoltage'][0],
                             'spherical_abberation': optics['rlnSphericalAberration'][0],
                             'amplitude_contrast': optics['rlnAmplitudeContrast'][0]
 
-    }
+    } for i in range(len(part_locs))]
 
     return ctf_params
 
-def preprocess(im: np.ndarray, config: Any,ds_size, 
+def preprocess(images: np.ndarray, config: Any,ds_size, 
                part_locs: Optional[pd.DataFrame]= None, optics: Optional[pd.DataFrame] = None, 
                 rng = None) -> Tuple[np.ndarray, np.ndarray]:
     
@@ -208,8 +209,12 @@ def preprocess(im: np.ndarray, config: Any,ds_size,
     Returns:
         Tuple of (sinogram, preprocessed image).
     """
+    image_dim = images.ndim
+    if image_dim == 2:
+        images = images[np.newaxis]
+
     if config.snr is not None:
-        im = add_noise(im, rng, config.snr)
+        images = np.array([add_noise(x, rng, config.snr) for x in images])
     
     ctf_params = None
 
@@ -217,8 +222,8 @@ def preprocess(im: np.ndarray, config: Any,ds_size,
 
         ctf_params = populate_ctf_params(part_locs, optics)
 
-    im, _ = filter_image(
-        im, 
+    images, _ = filter_image(
+        images, 
         low=config.lowpass, high=config.highpass,
         pixel_size=config.pixel_size,
         ctf_params=ctf_params,
@@ -226,21 +231,72 @@ def preprocess(im: np.ndarray, config: Any,ds_size,
         )
     
     if config.tightmask:
-        mask = tightmask(im)
-        im = im*mask
+        mask = np.array([tightmask(x) for x in images])
+        images *= mask
         del mask   
     if config.centre_particles:
-      x_shift = np.round(part_locs.loc['rlnOriginXAngst']/optics.loc[0,'rlnImagePixelSize']).astype(int)
-      y_shift = np.round(part_locs.loc['rlnOriginYAngst']/optics.loc[0,'rlnImagePixelSize']).astype(int)
 
-      im = recentre_image(im, y_shift, x_shift)
+      images = recentre_image(images, part_locs,optics)
+
+    images = downscale(images, ds_size)
+    images = stand_image(images)
+    images = circular_mask(images)
+    sinos = make_sinogram(images, config.lines)
+    if image_dim == 2:
+        sinos = sinos[0]
+        images = images[0]
+    return sinos, images
+
+def preprocess_multi(images: np.ndarray, config: Any,ds_size, 
+               part_locs: Optional[pd.DataFrame]= None, optics: Optional[pd.DataFrame] = None, 
+                rng = None) -> Tuple[np.ndarray, np.ndarray]:
+    
+    """
+    Apply full preprocessing pipeline to image.
+
+    Args:
+        im: Raw image.
+        config: Configuration object.
+        ds_size: Downscaled image size.
+
+    Returns:
+        Tuple of (sinogram, preprocessed image).
+    """
+
+    if config.snr is not None:
+        images = add_noise(images, rng, config.snr)
+    
+    ctf_params = None
+
+    if images.ndim == 2:
+        images = images[np.newaxis]
+
+    if config.apply_ctf_correction:
+
+        ctf_params = populate_ctf_params(part_locs, optics)
+
+    images, _ = filter_image(
+        images, 
+        low=config.lowpass, high=config.highpass,
+        pixel_size=config.pixel_size,
+        ctf_params=ctf_params,
+        method=config.filter_method,
+        )
+    
+    if config.tightmask:
+        mask = tightmask(images)
+        images = images*mask
+        del mask   
+    if config.centre_particles:
+
+      images = recentre_image(images, part_locs, optics)
 
 
-    im = downscale(im, ds_size)
-    im = stand_image(im)
-    im = circular_mask(im)
-    sino = make_sinogram(im, config.lines)
-    return sino, im
+    images = downscale(images, ds_size)
+    images = stand_image(images)
+    images = circular_mask(images)
+    sinos = make_sinogram(images, config.lines)
+    return sinos, images
 
 def multi_mrcs(dset_path: str, 
                ntot: int, 
@@ -407,23 +463,27 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int], optics: pd.Dat
     """
     name_ids: List[str] = []
     subsize = len(subset)
-    all_sinos = None
-    all_ims = None
-    for x, x_sb in enumerate(subset):
-        im, name_ids = open_part(x_sb, part_locs, name_ids, config.dataset)
+    all_images = None
 
-        if x == 0:
-            ds_size = int(im.shape[0] // config.downscale)
-            all_sinos = np.zeros((subsize, config.lines, ds_size))
-            all_ims = np.zeros((subsize, ds_size, ds_size))
-        if config.dataset.suffix in [".mrcs",".mrc",".txt"]:
-            part_info = None
 
+    for x in subset:
+        image, name_ids = open_part(x, part_locs, name_ids, config.dataset)
+
+        if all_images is None:
+            ds_size = int(image.shape[0] // config.downscale)
+            all_images = np.zeros((subsize, ds_size, ds_size))
+            all_images[0] = image
         else:
-            part_info = part_locs.loc[x]
 
-        sino,imout = preprocess(im, config, ds_size, part_info, optics, rng)
-        all_sinos[x] = sino
-        all_ims[x] = imout
+            all_images[x] = image
 
-    return all_sinos,all_ims, subsize, name_ids
+
+    if config.dataset.suffix == '.star':
+        part_info = part_locs[subset].reset_index(keep=False)
+    else:
+        part_info = None
+
+    all_sinos,all_images = preprocess(all_images, config, ds_size, part_info, optics, rng)
+
+
+    return all_sinos, all_images, subsize, name_ids
