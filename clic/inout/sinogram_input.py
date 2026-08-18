@@ -66,7 +66,7 @@ def stand_image(images: np.ndarray) -> np.ndarray:
     Returns:
         Standardized image.
     """
-    return np.array([(x - np.mean(x)) / np.std(x) for x in images])
+    return np.array([x if np.std(x)==0 else (x - np.mean(x)) / np.std(x) for x in images])
 
 
 def add_noise(image: np.ndarray, rng, snr: float = 1) -> np.ndarray:
@@ -149,7 +149,7 @@ def make_sinogram(image: np.ndarray, nlines: int = 120) -> np.ndarray:
         Transposed sinogram array.
     """
     theta = np.linspace(0., 360., nlines, endpoint=False)
-    return radon(image, theta=theta, circle=True).T
+    return np.array([radon(x, theta=theta, circle=True).T for x in image])
 
 
 def find_im_size(path: str) -> int:
@@ -283,8 +283,8 @@ def preprocess_multi(images: np.ndarray, config: Any,ds_size,
         method=config.filter_method,
         )
     
-    if config.tightmask:
-        mask = tightmask(images)
+    if config.tightmask is not None:
+        mask = tightmask(images,config.tightmask)
         images = images*mask
         del mask   
     if config.centre_particles:
@@ -312,7 +312,8 @@ def multi_mrcs(dset_path: str,
     """
 
     if 'mrc' in dset_path.suffix:
-        files = glob(str(dset_path)) 
+        files = glob(str(dset_path))
+        
 
     elif 'txt' in dset_path.suffix:
 
@@ -322,8 +323,12 @@ def multi_mrcs(dset_path: str,
         
     if len(files) == 0:
         print("No mrc files found!")
+    nsub = 1
+    if ntot > len(files):
+        nsub = ntot // len(files)
+    else:
 
-    nsub = ntot // len(files)
+        files = random.sample(files, ntot)
 
     for f,file in  enumerate(files):
 
@@ -346,6 +351,7 @@ def multi_mrcs(dset_path: str,
             else:
                 mdata = mfile.data[np.newaxis,:]
                 id_len = 1
+                choice=np.array([0])
             
         
         fids = [str(file)]*id_len
@@ -401,7 +407,6 @@ def get_part_locs(config: Any, rng) -> Tuple[Any, int]:
 
     elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
         particles_sub, n_max = multi_mrcs(dset_path,config.num,rng)
-        print(particles_sub)
     else:
         print(f"Error: Invalid path specification: {dset_path}")
         sys.exit()
@@ -440,6 +445,7 @@ def open_part(x: int, part_locs: Any, name_ids: List[str], dset_path: str,
     elif dset_path.suffix in ['.txt','.mrc','.mrcs']:
     
         im = part_locs[0][x]
+    
         name_ids.append(part_locs[1][x])
     else:
         print(f"Error: Invalid path specification: {dset_path}")
@@ -465,25 +471,24 @@ def sinogram_main(config: Any, part_locs: Any, subset: List[int], optics: pd.Dat
     subsize = len(subset)
     all_images = None
 
-
-    for x in subset:
+    for i,x in enumerate(subset):
         image, name_ids = open_part(x, part_locs, name_ids, config.dataset)
 
         if all_images is None:
             ds_size = int(image.shape[0] // config.downscale)
             all_images = np.zeros((subsize, ds_size, ds_size))
             all_images[0] = image
+
         else:
 
-            all_images[x] = image
-
+            all_images[i] = image
 
     if config.dataset.suffix == '.star':
         part_info = part_locs[subset].reset_index(keep=False)
     else:
         part_info = None
 
-    all_sinos,all_images = preprocess(all_images, config, ds_size, part_info, optics, rng)
+    all_sinos,all_images = preprocess_multi(all_images, config, ds_size, part_info, optics, rng)
 
 
     return all_sinos, all_images, subsize, name_ids

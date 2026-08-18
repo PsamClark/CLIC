@@ -72,7 +72,7 @@ if not sys.warnoptions:
               default=1, type=float)
 @click.option("-tm", "--tightmask",
               help = "apply tightmask before filtering",
-              is_flag=True)
+              default = None)
 @click.option("-cp", "--centre-particles",
               help = "center particles if star file with devaitions exists",
               is_flag=True)
@@ -85,6 +85,12 @@ if not sys.warnoptions:
 @click.option("-c", "--comps",
               help = "number of components in dimensional reduction",
               default=None, type=int)
+@click.option("-nn", "--nearest-neighbours",
+              help = "number of nearest neighbours (for UMAP and LLE)",
+              default=15, type=int)
+@click.option("-md", "--min-distance",
+              help = "minimum distance (for UMAP)",
+              default=0.15, type=float)
 @click.option("-m", "--model",
                help = "Dimension reduction technique",
                default='UMAP', type=str)
@@ -114,6 +120,8 @@ def run(dataset,
         pixel_size,
         filter_method,
         comps,
+        nearest_neighbours,
+        min_distance,
         model,
         apply_ctf_correction,
         centre_particles, 
@@ -147,7 +155,7 @@ def run(dataset,
         part_ids = part_locs[1]
     
     else: 
-        part_ids = part_locs['rlnImageName']
+        part_ids = part_locs[1]
 
     with open(f"{exp_dir}/particle_ids.txt", "w") as fl:
 
@@ -187,11 +195,21 @@ def run(dataset,
         config.num = num  # Update with lowest num
 
         if config.comps is not None:
-            lines_reddim, mod_fit, model = fitmodel(all_sinos, config.model, config.comps)
+            lines_reddim, mod_fit, model = fitmodel(all_sinos,
+                                                    config.model, 
+                                                    config.comps,
+                                                    config.nearest_neighbours,
+                                                    config.min_distance)
 
             if config.save_model:
                 np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
-                np.save(f"{batch_dir}/lines_reddim.npy",lines_reddim)
+                np.save(f"{batch_dir}/cents_reddim.npy",
+                        get_centroids(lines_reddim,
+                                      config.lines))
+                print(all_sinos.shape)
+                np.save(f"{batch_dir}/cents.npy",
+                        np.mean(all_sinos,
+                                axis=1))
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
 
             

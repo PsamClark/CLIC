@@ -86,7 +86,6 @@ def end_write(tags: List[str], table: List[List[str]],
     cluster_table['rlnID'] = np.insert(np.arange(len(ids)), 0, 0)
 
     cluster_table['rlnImageName'] = np.insert(ids,0,'z_score')
-    print(cluster_table)
     starfile.write({'particles': cluster_table}, f'{clic_dir}/particles_CLIC.star')
 
 

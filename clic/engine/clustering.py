@@ -479,7 +479,7 @@ def clustering_unknown(lines: np.ndarray,config:Config, centroids: bool = True):
     return clusters, num_clusters
 
 def get_centroids(line_data: np.ndarray,nlines:int) -> np.ndarray:
-
+    print(line_data.shape)
     sinodata = np.reshape(
                 np.ascontiguousarray(line_data),
                 (int(line_data.shape[0]/nlines), nlines, line_data.shape[-1]))

@@ -18,6 +18,7 @@ from typing import Tuple, Optional
 
 import numpy as np
 from skimage.transform import resize
+from skimage.segmentation import clear_border
 import skimage.morphology as mph
 import cv2
 
@@ -33,9 +34,8 @@ def binar_image(image: np.ndarray, sigma: float = 3) -> np.ndarray:
     Returns:
         Binary image.
     """
-    oimage = get_image_outer(image)
-    omean = oimage.mean()
-    ostd = oimage.std()
+    omean = image.mean()
+    ostd = image.std()
     return (image >= omean + ostd * sigma) | (image <= omean - ostd * sigma)
 
 
@@ -57,8 +57,28 @@ def get_image_outer(image: np.ndarray) -> np.ma.MaskedArray:
     mask = dist <= radius
     return np.ma.array(image, mask=mask)
 
+def circular_tightmask(mask: np.ndarray) -> np.ma.MaskedArray:
+    """
+    Mask central circular region to isolate outer image.
 
-def tightmask(image: np.ndarray, lpass: int = 8,
+    Args:
+        image: Input image.
+
+    Returns:
+        Masked array with central region excluded.
+    """
+    h, w = mask.shape
+    center = (w // 2, h // 2)
+    y, x = np.ogrid[:h, :w]
+    dist = np.sqrt((x - center[0]) ** 2 + (y - center[1]) ** 2)
+    min_radius = np.ma.array(dist, mask=np.abs(mask-1)).max()
+    if min_radius > (w//2)**2:
+        min_radius = (w//2)**2
+    mask = dist <= min_radius
+    return mask
+
+
+def tightmask(image: np.ndarray,method = "close", lpass: int = 20,
                dilate_radius: int = 5, gkern_size: int = 5) -> np.ndarray:
     """
     Generate tight mask around particle using bandpass filtering and dilation.
@@ -75,8 +95,21 @@ def tightmask(image: np.ndarray, lpass: int = 8,
     filt_image, _ = filter_image(image, low=lpass)
     bin_image = binar_image(filt_image)
     disc = mph.disk(dilate_radius)
-    dilated = mph.binary_dilation(bin_image, disc).astype(float)
-    gauss_tmask = cv2.GaussianBlur(dilated, (gkern_size, gkern_size), 0)
+    dilated = np.array(
+        [mph.binary_dilation(x, disc).astype(float) for x in bin_image]
+        )
+    cleared = np.array(
+        [clear_border(x) for x in dilated]
+        )
+    if method == "circular":
+        mask = np.array(
+            [circular_tightmask(x).astype(float) for x in cleared]
+            )
+    else: 
+        mask = cleared
+    gauss_tmask =np.array([
+        cv2.GaussianBlur(x, (gkern_size, gkern_size), 0) for x in mask]
+    )
     return gauss_tmask.astype(np.float32)
 
 
@@ -104,10 +137,34 @@ def Fo2Re(four_trans: np.ndarray,im_shape: list) -> np.ndarray:
     Returns:
         Shifted 2D Fourier spectrum.
     """
-    image = np.fft.ifftn(np.fft.ifftshift(four_trans))
+    image = np.fft.ifftn(np.fft.ifftshift(four_trans)).real
     if im_shape[0] | im_shape[1] != four_trans.shape[0]: 
         image = resize(image, im_shape)
+
     return image
+
+def noise_whitening(spec: np.ndarray, average:bool=True) -> np.ndarray:
+
+    power_spec = np.abs(spec)**2
+
+    if average:
+        average_pspec = np.mean(power_spec,axis=0)
+
+        radial_pspec = compute_radial_profile(average_pspec)
+
+        noise_amplitude = np.sqrt(radial_pspec) + 1e-8
+
+        whitened_spec = spec/noise_amplitude
+
+    else:
+
+        radial_pspec = np.array([compute_radial_profile(x) for x in power_spec])
+
+        noise_amplitude = np.sqrt(radial_pspec) + 1e-8
+
+        whitened_spec = spec/noise_amplitude
+
+    return whitened_spec
 
 
 def filter_image(image: np.ndarray,
@@ -133,11 +190,14 @@ def filter_image(image: np.ndarray,
     Returns:
         Tuple of (filtered image, filter mask).
     """
-    original_shape=image.shape
-    if len(original_shape) == 2:
-        image = image[np.newaxis]
+    original_dim = image.ndim
+    if original_dim == 2:
 
+        image = image[np.newaxis]
+    original_shape = image.shape[1:]
     spec = np.array([Re2Fo(x) for x in image])
+
+    spec = noise_whitening(spec)
 
     if low is None and high is None:
         mask=np.ones(spec.shape[1:])
@@ -147,18 +207,23 @@ def filter_image(image: np.ndarray,
         hpass = 0 if high is None else spec.shape[1] * pixel_size / high
 
         mask = bandpass_mask(spec, lpass, hpass, width, order, method)
-        mask = mask[np.newaxis].repeat(image.shape[0],0)
+        mask = mask[np.newaxis]
+
+        mask = mask.repeat(spec.shape[0],0)
+
 
     if  ctf_params is not None:
         
         ctfs= np.array([generate_ctf(image.shape[1],**ctf_pms) for ctf_pms in ctf_params])
 
         mask *= ctfs
+        
     bp_spec = spec*mask
-    filt_im = np.array([Fo2Re(x,original_shape).real for x in bp_spec])
+
+    filt_im = np.array([Fo2Re(x,original_shape) for x in bp_spec])
     filt_im = np.array([standardise_image(x) for x in filt_im])
 
-    if len(original_shape) == 2:
+    if original_dim == 2:
         filt_im = filt_im[0]
 
 
@@ -190,7 +255,7 @@ def bandpass_mask(image: np.ndarray,
     Returns:
         Tuple of (filtered spectrum, mask).
     """
-    mask = np.ones(image.shape)
+    mask = np.ones(image.shape[1:])
     if method == "gauss":
         mask = bp_gauss(mask, low, high, width)
     elif method == "butter":
@@ -434,4 +499,5 @@ def compute_radial_profile(data: np.ndarray) -> np.ndarray:
     
     # Map the 1D profile back to a 2D image
     radial_map = radial_profile[r]
+
     return radial_map
