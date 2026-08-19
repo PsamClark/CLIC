@@ -49,7 +49,7 @@ class Config(BaseModel):
     num: PositiveInt = Field(1000, description = "dataset size")
     batch_size: Optional[int] = Field(None,description="Batch size")
     downscale: PositiveFloat = Field(1,description="downscaling")
-    tightmask: bool = Field(False, description= "apply tightmask")
+    tightmask: Optional[Any] = Field(None, description= "apply tightmask")
     filter_method: str = Field("butter",description="bandpass filter method")
     lowpass: Optional[int] = Field(None,description="lowpass filter value in angstrom")
     highpass: Optional[int] = Field(None,description="highpass filter value in angstrom ")
@@ -62,6 +62,9 @@ class Config(BaseModel):
 
     lines: PositiveInt = Field(120,description="number of sinogram lines")
     comps: PositiveInt = Field(3, description="number of dimensins to reduce to")
+    nearest_neighbours: PositiveInt = Field(15, description="nearest neighbours (for UMAP and LLE)")
+    min_distance: PositiveFloat = Field(0.15, description="minimum distance (for UMAP)")
+
     clusters: Optional[PositiveInt] = Field(2,description="number of clusters")
     gpu: bool = Field(False, description="use GPUs")
     save_model: bool = Field(False, description="save model")
@@ -149,10 +152,8 @@ def collate_scores() -> None:
     for exp_conf in experiments:
         
         exp_id = Path(exp_conf).stem
-        print(exp_id)
 
         config = load_config(exp_conf)
-        print(config.model)
 
         score = score_clustering(exp_id)
         if score is None:
@@ -163,7 +164,6 @@ def collate_scores() -> None:
     features.append("accuracy")
     features.insert(0, "exp_id")
     out_df = pd.DataFrame(data=out_list, columns=features)
-    print(out_df['model'])
 
     cwd = Path.cwd()
     out_df.to_csv(f"{cwd.name}_cs.csv", index=False)
@@ -192,7 +192,6 @@ def collate_configs() -> None:
         out_list.append(values)
 
     out_df = pd.DataFrame(data=out_list, columns=features)
-    print(out_df['model'])
 
     cwd = Path.cwd()
     out_df.to_csv(f"{cwd.name}_config_log.csv", index=False)

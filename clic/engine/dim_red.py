@@ -23,7 +23,7 @@ import numpy as np
 
 from  sklearn.decomposition import PCA
 from  sklearn.manifold import Isomap, LocallyLinearEmbedding as LLE
-from  sklearn.manifold import MDS, TSNE
+from  sklearn.manifold import MDS, TSNE, trustworthiness
 from umap import UMAP
 from trimap import TRIMAP
 
@@ -53,7 +53,8 @@ def split_sinos(sinos: np.ndarray) -> np.ndarray:
     return np.reshape(sinos, (-1, sinos.shape[2]))
 
 
-def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int
+def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int,
+             nn: int, min_dist: float, 
              ) -> Tuple[np.ndarray, Union[object, None]]:
     """
     Fit a dimensionality reduction model to sinogram lines.
@@ -86,7 +87,7 @@ def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int
     elif model_choice == 'TSNE':
         model = TSNE(n_components=num_comps)
     elif model_choice == 'UMAP':
-       model = UMAP(n_neighbors=5, min_dist=0.3, n_components=num_comps,random_state=42)
+       model = UMAP(n_neighbors=nn, min_dist=min_dist, n_components=num_comps,random_state=42)
     elif model_choice == 'TRIMAP':
         model = TRIMAP(n_iters=1000)
 
@@ -99,7 +100,6 @@ def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int
         mod_fit = model.fit(lines)
         sinos_trans = model.transform(lines)
 
-    comp_var(sinos_trans)
 
     if model_choice == 'PCA_skip':
         sinos_trans = sinos_trans[:, 1:]
