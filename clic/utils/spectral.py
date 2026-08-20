@@ -138,11 +138,9 @@ def Fo2Re(four_trans: np.ndarray,im_shape: list) -> np.ndarray:
         Shifted 2D Fourier spectrum.
     """
     image = np.fft.ifftn(np.fft.ifftshift(four_trans)).real
-    print(image.shape)
 
     if im_shape[0] | im_shape[1] != four_trans.shape[0]: 
         image = resize(image, im_shape)
-    print(image.shape)
     return image
 
 def noise_whitening(spec: np.ndarray, average:bool=True) -> np.ndarray:
@@ -192,6 +190,7 @@ def filter_image(image: np.ndarray,
     Returns:
         Tuple of (filtered image, filter mask).
     """
+    print("hello")
     original_dim = image.ndim
     if original_dim == 2:
 
@@ -199,8 +198,7 @@ def filter_image(image: np.ndarray,
     original_shape = image.shape[1:]
     spec = np.array([Re2Fo(x) for x in image])
 
-    #spec = noise_whitening(spec)
-    print(spec.shape)
+    spec = noise_whitening(spec)
 
     if low is None and high is None:
         mask=np.ones(spec.shape[1:])
@@ -208,12 +206,12 @@ def filter_image(image: np.ndarray,
     else:
         lpass = np.inf if low is None else (spec.shape[1]) * pixel_size / low
         hpass = 0 if high is None else (spec.shape[1]) * pixel_size / high
+        print(width)
 
         mask = bandpass_mask(spec, lpass, hpass, width, order, method)
         mask = mask[np.newaxis]
 
         mask = mask.repeat(spec.shape[0],0)
-    print(lpass,hpass)
 
     if  ctf_params is not None:
         
@@ -230,7 +228,7 @@ def filter_image(image: np.ndarray,
         filt_im = filt_im[0]
 
 
-    return filt_im, mask[0], bp_spec[0].astype(np.float32)
+    return filt_im, mask[0].astype(np.float32)
 
 def standardise_image(image: np.ndarray) -> np.ndarray:
 
