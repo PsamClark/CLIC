@@ -190,7 +190,6 @@ def filter_image(image: np.ndarray,
     Returns:
         Tuple of (filtered image, filter mask).
     """
-    print("hello")
     original_dim = image.ndim
     if original_dim == 2:
 
@@ -206,7 +205,6 @@ def filter_image(image: np.ndarray,
     else:
         lpass = np.inf if low is None else (spec.shape[1]) * pixel_size / low
         hpass = 0 if high is None else (spec.shape[1]) * pixel_size / high
-        print(width)
 
         mask = bandpass_mask(spec, lpass, hpass, width, order, method)
         mask = mask[np.newaxis]
