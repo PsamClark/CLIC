@@ -208,8 +208,7 @@ def run(dataset,
                                       config.lines))
                 print(all_sinos.shape)
                 np.save(f"{batch_dir}/cents.npy",
-                        np.mean(all_sinos,
-                                axis=1))
+                        all_sinos)
                 joblib.dump(model,f"{batch_dir}/dimred.mod")
 
             
