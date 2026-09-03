@@ -32,6 +32,7 @@ from pathlib import Path, PurePath
 import json
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import h5py
 from .analysis.metrics import score_clustering
 
@@ -134,6 +135,14 @@ def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> Non
     Returns:
         None
     """
+    plt.imshow(all_ims[0])
+    plt.savefig(f"{exp_id}/sample_image.png")
+    plt.close()
+
+    plt.imshow(all_sinos[0])
+    plt.savefig(f"{exp_id}/sample_sino.png")
+    plt.close()
+
     with h5py.File(f"{exp_id}/batch1_images.hdf5", "w") as imfile:
         imfile.create_dataset('images', data=all_ims)
         imfile.create_dataset('sinograms', data=all_sinos)
