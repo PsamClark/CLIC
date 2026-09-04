@@ -62,7 +62,7 @@ class Config(BaseModel):
     cluster_method: str = Field("hdbscan",description="method of clustering when unknown clusters")
 
     lines: PositiveInt = Field(120,description="number of sinogram lines")
-    comps: PositiveInt = Field(3, description="number of dimensins to reduce to")
+    comps: List[PositiveInt] = Field([3,2], description="number of dimensions to reduce to")
     nearest_neighbours: PositiveInt = Field(15, description="nearest neighbours (for UMAP and LLE)")
     min_distance: PositiveFloat = Field(0.15, description="minimum distance (for UMAP)")
 
@@ -100,6 +100,9 @@ def store_config(config: Any, exp_id: str) -> None:
 
         if isinstance(val, PurePath):
             config_dict[key] = str(val)
+
+        if isinstance(val,list):
+            config_dict[key] = ','.join([str(i) for i in val])
     
     Path("Configs").mkdir(exist_ok=True)
 
@@ -111,7 +114,11 @@ def load_config(fpath):
 
     try:
         with open(fpath, "r") as conffile:
-            config = Config(**json.load(conffile))
+
+            conf = json.load(conffile)
+
+            conf["comps"] = [int(i) for i in str(conf["comps"]).split(",")]
+            config = Config(**conf)
 
         if  len(str(config.dataset)) ==0:
             raise ValueError("dataset path not provided!")
@@ -142,10 +149,6 @@ def store_images(all_ims: Any, all_sinos: Any, all_ids: Any, exp_id: str) -> Non
     plt.imshow(all_sinos[0])
     plt.savefig(f"{exp_id}/sample_sino.png")
     plt.close()
-
-    with h5py.File(f"{exp_id}/batch1_images.hdf5", "w") as imfile:
-        imfile.create_dataset('images', data=all_ims)
-        imfile.create_dataset('sinograms', data=all_sinos)
 
 
 def collate_scores() -> None:

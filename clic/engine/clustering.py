@@ -510,7 +510,7 @@ def clustering_main(lines, config, clic_dir, ids):
     if config.gpu:
         sinos = np.reshape(
             np.ascontiguousarray(lines),
-            (config.num, config.lines, config.comps))
+            (config.num, config.lines, config.comps[-1]))
         scoretable = np.zeros((config.num, config.num), dtype=np.float32)
         disttable = np.array([])
         

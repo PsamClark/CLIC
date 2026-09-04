@@ -40,7 +40,7 @@ class SinogramInputTest(unittest.TestCase):
             "snr": None,
             "model": "UMAP",
             "lines": 120,
-            "comps": 10,
+            "comps": [10],
             "clusters": 3,
             "gpu":True,
             "save_model": False

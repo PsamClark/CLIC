@@ -84,7 +84,7 @@ if not sys.warnoptions:
               default="butter", type=str)
 @click.option("-c", "--comps",
               help = "number of components in dimensional reduction",
-              default=None, type=int)
+              default=None, type=str)
 @click.option("-nn", "--nearest-neighbours",
               help = "number of nearest neighbours (for UMAP and LLE)",
               default=15, type=int)
@@ -142,7 +142,14 @@ def run(dataset,
     if rng is None:
         rng = np.random.RandomState()
 
-    config = Config(**locals().copy())
+    local_args = locals().copy()
+
+    local_args['comps'] = [int(i) for i in local_args['comps'].split(',')]
+
+    config = Config(**local_args)
+
+    if config.model == "PCA+UMAP" and len(config.comps) == 1:
+        raise Exception("When using PCA+UMAP two components seperated by a comma must be provided!")
     exp_id = random_string(6)
     store_config(config,exp_id)    
     exp_dir = f"exp_{exp_id}"
@@ -177,6 +184,9 @@ def run(dataset,
 
         all_sinos, all_ims, num, name_ids = sinogram_main(config, part_locs,
                                                                   batch, optics, rng)
+        if config.save_model:
+                np.save(f"{batch_dir}/cents.npy",
+                        all_sinos)
         if b == 0:
             store_images(all_ims, all_sinos, name_ids, exp_dir)
         if isinstance(name_ids, pd.DataFrame):
@@ -195,21 +205,18 @@ def run(dataset,
         config.num = num  # Update with lowest num
 
         if config.comps is not None:
-            lines_reddim, mod_fit, model = fitmodel(all_sinos,
+            lines_reddim = fitmodel(all_sinos,
                                                     config.model, 
                                                     config.comps,
                                                     config.nearest_neighbours,
-                                                    config.min_distance)
+                                                    config.min_distance,
+                                                    batch_dir,
+                                                    config.save_model)
 
             if config.save_model:
-                np.save(f"{batch_dir}/mod_fit.npy",mod_fit)
-                np.save(f"{batch_dir}/cents_reddim.npy",
-                        get_centroids(lines_reddim,
-                                      config.lines))
-                print(all_sinos.shape)
                 np.save(f"{batch_dir}/cents.npy",
                         all_sinos)
-                joblib.dump(model,f"{batch_dir}/dimred.mod")
+
 
             
         else:
