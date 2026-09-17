@@ -230,11 +230,27 @@ def filter_image(image: np.ndarray,
 
 def standardise_image(image: np.ndarray) -> np.ndarray:
 
+    image = np.abs(normalise(image))
+
     image = (image - np.min(image)) / np.ptp(image) * 255
 
-    image = np.abs(image)
+    return image.astype(np.uint8)
 
-    return np.invert(image.astype(np.uint8))
+def normalise(image):
+    """Normalise image based on normal distribution.
+
+    Args:
+        image (np.ndarray): Input image.
+
+    Returns:
+        np.ndarray: Scaled and blurred image as uint8.
+    """
+ 
+    mean = np.mean(image)
+    sig = np.std(image)
+    image = (image - mean) / sig
+    
+    return image
 
 def bandpass_mask(image: np.ndarray,
              low: float = np.inf,
