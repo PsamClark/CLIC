@@ -116,6 +116,8 @@ def load_config(fpath):
         with open(fpath, "r") as conffile:
 
             conf = json.load(conffile)
+            if isinstance(conf["comps"],int):
+                conf["comps"] =str(conf["comps"])
             if isinstance(conf["comps"],str) or isinstance(conf["comps"],int):
                 conf["comps"] = [int(i) for i in conf["comps"].split(',')]
             config = Config(**conf) 

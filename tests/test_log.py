@@ -20,9 +20,10 @@ class LogTest(unittest.TestCase):
 
         self._orig_dir = os.getcwd()
         self.temp_dir = tempfile.TemporaryDirectory()
-
         self.confile = join(dirname(experiments.__file__), "Configs/46lLtH.json")
 
+        self.confile_legacy = join(dirname(experiments.__file__), "Configs/46lLtH_legacy.json")
+        
         self.confile_missing_path = join(
             dirname(experiments.__file__),
             "Configs/config_missing_dpath.json")
@@ -71,6 +72,21 @@ class LogTest(unittest.TestCase):
         )
 
         self.assertEqual(data.model_dump(),config_data.model_dump())
+
+    def test_validate_config_legacy(self):
+
+        data = load_config(
+            self.confile_legacy
+        )
+
+        config_data = self.config
+
+        self.assertEqual(
+            len(data.model_dump().items()), len(self.default_config.model_dump().items())
+        )
+
+        self.assertEqual(data.model_dump(),config_data.model_dump())
+
 
     def tearDown(self):
         os.chdir(self._orig_dir)
