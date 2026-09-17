@@ -232,6 +232,8 @@ def standardise_image(image: np.ndarray) -> np.ndarray:
 
     image = (image - np.min(image)) / np.ptp(image) * 255
 
+    image = np.abs(image)
+
     return np.invert(image.astype(np.uint8))
 
 def bandpass_mask(image: np.ndarray,
