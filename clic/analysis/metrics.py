@@ -81,8 +81,9 @@ def optimize_clustering(clic_exp: str, dir = None) -> pd.DataFrame:
     try:
         data = np.load(f"{mpath}/cluster_matrix.npy")
     except:
+        print("No data found!")
         return None
-
+   
     aligned_matrix = align_batches(data)
     all_classes = make_line(aligned_matrix)
 
@@ -95,7 +96,6 @@ def optimize_clustering(clic_exp: str, dir = None) -> pd.DataFrame:
     class_counts = fmt_classes.groupby(["id", "class"])["class"].agg("count")
     cc_df = class_counts.to_frame(name="count").reset_index()
     cc_piv = cc_df.pivot(index="class", columns="id", values="count").fillna(0)
-
     return cc_piv.astype(int)
 
 
@@ -112,7 +112,7 @@ def score_clustering(exp_id: Union[str, int], dir = None) -> float:
     return cluster_accuracy(optimize_clustering(f"exp_{exp_id}",dir = dir))
 
 
-def plot_clustering(exp_id: Union[str, int], dir = None) -> None:
+def plot_clustering(exp_id: Union[str, int], dir = None) -> sns.heatmap:
     """
     Plot clustering heatmap for a given experiment.
 
@@ -122,7 +122,7 @@ def plot_clustering(exp_id: Union[str, int], dir = None) -> None:
     Returns:
         None
     """
-    sns.heatmap(
+    return sns.heatmap(
         optimize_clustering(exp_id,dir = dir),
         annot=True,
         fmt="d",

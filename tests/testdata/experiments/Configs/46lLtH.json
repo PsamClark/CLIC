@@ -10,7 +10,7 @@
   "snr": null,
   "model": "UMAP",
   "lines": 120,
-  "comps": 10,
+  "comps": [10],
   "clusters": 3,
   "gpu": true,
   "save_model": false
