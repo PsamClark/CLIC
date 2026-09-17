@@ -20,7 +20,7 @@ Dependencies:
 """
 from typing import List, Tuple, Union
 import numpy as np
-
+import joblib
 from  sklearn.decomposition import PCA
 from  sklearn.manifold import Isomap, LocallyLinearEmbedding as LLE
 from  sklearn.manifold import MDS, TSNE, trustworthiness
@@ -53,9 +53,9 @@ def split_sinos(sinos: np.ndarray) -> np.ndarray:
     return np.reshape(sinos, (-1, sinos.shape[2]))
 
 
-def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int,
-             nn: int, min_dist: float, 
-             ) -> Tuple[np.ndarray, Union[object, None]]:
+def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: List[int],
+             nn: int, min_dist: float, batch_dir:str, save_model:bool
+             ) -> np.ndarray:
     """
     Fit a dimensionality reduction model to sinogram lines.
 
@@ -73,35 +73,60 @@ def fitmodel(sinos: np.ndarray, model_choice: str, num_comps: int,
 
     # LINEAR
     if model_choice == 'PCA_skip':
-        model = PCA(n_components=num_comps + 1)
-    elif model_choice == 'PCA':
-        model = PCA(n_components=num_comps)
+        model = [PCA(n_components=num_comps[0] + 1)]
+    elif 'PCA' in model_choice:
+        print("hello")
+        model = [PCA(n_components=num_comps[0])]
 
     # MANIFOLDS
     elif model_choice == 'ISOMAP':
-        model = Isomap(n_components=num_comps)
+        model = [Isomap(n_components=num_comps[0])]
     elif model_choice == 'LLE':
-        model = LLE(n_components=num_comps, n_neighbors=5)
+        model = [LLE(n_components=num_comps[0], n_neighbors=5)]
     elif model_choice == 'MDS':
-        model = MDS(n_components=num_comps)
+        model = [MDS(n_components=num_comps[0])]
     elif model_choice == 'TSNE':
-        model = TSNE(n_components=num_comps)
-    elif model_choice == 'UMAP':
-       model = UMAP(n_neighbors=nn, min_dist=min_dist, n_components=num_comps,random_state=42)
+        model = [TSNE(n_components=num_comps[0])]
+
+    if 'UMAP' in model_choice:
+       if 'PCA' in model_choice:
+           print("I'm here")
+           model.append(UMAP(n_neighbors=nn, 
+                                 min_dist=min_dist, 
+                                 n_components=num_comps[1],random_state=42))
+           
+       else:
+           model = [UMAP(n_neighbors=nn, 
+                                 min_dist=min_dist, 
+                                 n_components=num_comps[0],random_state=42)]
     elif model_choice == 'TRIMAP':
-        model = TRIMAP(n_iters=1000)
-
+        model = [TRIMAP(n_iters=1000)]
+    print(model)
     lines = split_sinos(sinos)
-    if model_choice == "TSNE":
-        sinos_trans = model.fit_transform(lines)
-        mod_fit = None
-        
-    else:
-        mod_fit = model.fit(lines)
-        sinos_trans = model.transform(lines)
+
+    for i,mod in enumerate(model):
+        if model_choice == "TSNE":
+            lines = mod.fit_transform(lines)
+            mod_fit = None
+            
+        else:
+            mod_fit = mod.fit(lines)
+            lines = mod.transform(lines)
 
 
-    if model_choice == 'PCA_skip':
-        sinos_trans = sinos_trans[:, 1:]
+        if model_choice == 'PCA_skip':
+            lines = lines[:, 1:]
 
-    return sinos_trans, mod_fit, model
+        if save_model:
+            save_models(lines, mod_fit, mod, i, batch_dir)
+
+    return lines
+
+
+def save_models(lines, mod_fit, model,i: int,  batch_dir) -> None:
+
+    np.save(f"{batch_dir}/mod_fit{i}.npy",mod_fit)
+    np.save(f"{batch_dir}/cents_reddim{i}.npy",
+                        lines)
+
+    joblib.dump(model,f"{batch_dir}/dimred{i}.mod")

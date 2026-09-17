@@ -9,8 +9,8 @@
   "pixel_size": 1,
   "snr": null,
   "model": "UMAP",
-  "lines": "tree",
-  "comps": [10],
+  "lines": 120,
+  "comps": 10,
   "clusters": 3,
   "gpu": true,
   "save_model": false
