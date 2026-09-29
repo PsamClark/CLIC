@@ -238,6 +238,3 @@ def pop_features(config: Dict[str, Any], score: float,
 
     return features, out_list
 
-def ohk_to_label(matrix):
-
-    return(np.argmax(matrix,axis=-1))

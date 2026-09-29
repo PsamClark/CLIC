@@ -41,10 +41,10 @@ from .inout.sinogram_input import sinogram_main
 from .inout.sinogram_input import get_part_locs
 from .engine.dim_red import fitmodel
 from .engine.clustering import clustering_main, get_centroids
-from .log import random_string, ohk_to_label
+from .log import random_string 
 from .log import Config, store_config, store_images
 from .inout.star_writer import create
-from .utils.min_matrix import make_slice
+from .utils.min_matrix import make_slice, make_line
 from .utils.customs import WildCardType 
 
 # To silence deprecation warnings
@@ -240,14 +240,11 @@ def run(dataset,
     for b,batch in enumerate(batches):
         matrix[b] = make_slice(batch_classes[b], batch, matrix.shape)
     print (f"Number of clusters detected: {matrix.shape[-1]}")
-    labels = ohk_to_label(matrix)
-
-    batch_labels = [str(i) for i in range(matrix.shape[0])]
-
-    batch_df = pd.DataFrame(labels.T, columns=batch_labels)
+    labels = make_line(matrix)
 
 
-    batch_df.to_csv(f"{exp_dir}/labels.csv", index=False)
+    with open(f"{exp_dir}/labels.txt", "w") as f:
+        f.write("\n".join(map(str, labels)))
 
     np.save(f"{exp_dir}/cluster_matrix.npy", matrix)
     total_time = time.time() - start
