@@ -507,6 +507,8 @@ def clustering_main(lines, config, clic_dir, ids):
     cl_labels = list(range(config.num))
     cl_dict = initial_dict(lines, config.num)
     if config.gpu:
+        print('smae')
+        print(lines.shape)
         sinos = np.reshape(
             np.ascontiguousarray(lines),
             (config.num, config.lines, config.comps[-1]))
