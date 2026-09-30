@@ -84,3 +84,21 @@ class WildCardType(Path):
                 )
 
         return self.coerce_path_result(rv)
+
+
+def get_n_workers():
+    for var in (
+        "SLURM_CPUS_PER_TASK",
+        "SLURM_JOB_CPUS_PER_NODE",
+        "SLURM_CPUS_ON_NODE",
+    ):
+        if var in os.environ:
+            value = os.environ[var]
+
+            # Handle values like "16(x2)"
+            if "(" in value:
+                value = value.split("(")[0]
+
+            return int(value)
+
+    return os.cpu_count() or 1

@@ -28,6 +28,7 @@ import sys
 from typing import Optional
 import random
 from pathlib import PurePath
+from concurrent.futures import ProcessPoolExecutor
 from typing import Tuple, List, Any
 from glob import glob
 
@@ -39,7 +40,7 @@ import starfile
 import cv2
 
 from clic.utils.spectral import filter_image, tightmask, recentre_image
-
+from clic.utils.customs import get_n_workers
 
 def load_mrc(path: str) -> np.ndarray:
     """
@@ -137,7 +138,17 @@ def circular_mask(image: np.ndarray) -> np.ndarray:
     return image * mask
 
 
-def make_sinogram(image: np.ndarray, nlines: int = 120) -> np.ndarray:
+def _radon_one(args):
+
+    image, theta, circle = args
+    
+    return radon(
+    image,
+    theta=theta,
+    circle=circle,
+    ).T
+
+def make_sinogram(images: np.ndarray, nlines: int = 120) -> np.ndarray:
     """
     Generate sinogram from image using Radon transform.
 
@@ -148,9 +159,17 @@ def make_sinogram(image: np.ndarray, nlines: int = 120) -> np.ndarray:
     Returns:
         Transposed sinogram array.
     """
-    theta = np.linspace(0., 360., nlines, endpoint=False)
-    return np.array([radon(x, theta=theta, circle=True).T for x in image])
+    print("new_method")
+    worker_count = get_n_workers()
+    print(worker_count)
 
+    theta = np.linspace(0., 360., nlines, endpoint=False)
+
+    arguments = ((image, theta, True) for image in images)
+    with ProcessPoolExecutor(max_workers=worker_count) as executor:
+        sinograms = list(executor.map(_radon_one, arguments, chunksize=8))
+
+    return np.stack(sinograms)
 
 def find_im_size(path: str) -> int:
     """
@@ -242,6 +261,7 @@ def preprocess(images: np.ndarray, config: Any,ds_size,
     images = stand_image(images)
     images = circular_mask(images)
     sinos = make_sinogram(images, config.lines)
+
     if image_dim == 2:
         sinos = sinos[0]
         images = images[0]
